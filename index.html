@@ -222,6 +222,12 @@ async function atAll(table, params = []) {
   return out;
 }
 
+// One page, for the Journal's infinite scroll.
+async function atPage(table, params, offset) {
+  const j = await at(table, { params: offset ? params.concat([['offset', offset]]) : params });
+  return { records: j.records, offset: j.offset };
+}
+
 const esc = s => String(s).replace(/"/g, '\\"');
 
 /* ───────────────────────── shaping ───────────────────────── */
@@ -587,6 +593,300 @@ function NotesCard({ note, onAdd, onDelete, retry }) {
   );
 }
 
+/* ───────────────────────── journal ───────────────────────── */
+
+const isSkipped = t => /^\s*skipped\b/i.test(String(t || ''));
+
+function JournalTab({ data, days, logs, more, loading, onLoadMore, onOpenLine, ensureNote }) {
+  const byDate = useMemo(() => {
+    const m = new Map();
+    logs.forEach(l => { if (!l.date) return; if (!m.has(l.date)) m.set(l.date, []); m.get(l.date).push(l); });
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [logs]);
+
+  useEffect(() => { byDate.forEach(([d]) => ensureNote(d)); }, [byDate, ensureNote]);
+
+  return (
+    <React.Fragment>
+      {byDate.map(([date, dayLogs]) => {
+        const cards = buildCards(rowsForDate(data.schedule, date), data.exById);
+        const blockOf = {}, lineKeyOf = {};
+        cards.forEach(c => c.lines.forEach(l => {
+          if (!(l.exerciseId in blockOf)) { blockOf[l.exerciseId] = c.name; lineKeyOf[l.exerciseId] = l.key; }
+        }));
+
+        const groups = new Map(cards.map(c => [c.name, []]));
+        const unscheduled = [];
+        dayLogs.forEach(l => {
+          const b = blockOf[l.exerciseId];
+          if (b) groups.get(b).push(l); else unscheduled.push(l);
+        });
+
+        const shown = [...groups.entries()].filter(([, ls]) => ls.length);
+        if (unscheduled.length) shown.push(['Unscheduled', unscheduled]);
+        const note = (days[date] || {}).note;
+
+        return (
+          <React.Fragment key={date}>
+            <div className="jd">{fmtJournal(date)}</div>
+            {shown.map(([name, ls]) => (
+              <div className="card" key={name}>
+                <h3>{name}</h3>
+                {ls.map(l => (
+                  <div className={'jl' + (isSkipped(l.text) ? ' skip' : '')} key={l.id}
+                       onClick={() => onOpenLine(date, lineKeyOf[l.exerciseId])}>
+                    <div className="jn">{(data.exById[l.exerciseId] || {}).name || '(unknown exercise)'}</div>
+                    <div className="jt">{l.text}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {note && note.notes && note.notes.trim() && (
+              <div className="card notes">
+                <h3>Notes</h3>
+                <div className="notelines">
+                  {note.notes.split('\n').map(s => s.trim()).filter(Boolean).map((t, i) => <p key={i}>{t}</p>)}
+                </div>
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+      {loading && <div className="jd">Loading…</div>}
+      {!loading && more && <div className="jd" onClick={onLoadMore} style={{ color: 'var(--red)' }}>Load more</div>}
+      {!loading && !more && byDate.length > 0 && <div className="jd" style={{ color: 'var(--faint)' }}>End of log</div>}
+    </React.Fragment>
+  );
+}
+
+/* ───────────────────────── exercises ───────────────────────── */
+
+function ExercisesTab({ data }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(null);
+  const [hist, setHist] = useState({});     // exerciseId -> { logs, limit, loading }
+
+  const scheduledIds = useMemo(() => {
+    const s = new Set();
+    data.schedule.forEach(r => r.exercises.forEach(id => s.add(id)));
+    return s;
+  }, [data.schedule]);
+
+  // The row a scheduled exercise shows in its dropdown: prefer one that has a
+  // prescription, otherwise the first row that links it.
+  const rowFor = useMemo(() => {
+    const m = {};
+    data.schedule.forEach(r => r.exercises.forEach(id => {
+      if (!m[id] || (!m[id].prescription && r.prescription)) m[id] = r;
+    }));
+    return m;
+  }, [data.schedule]);
+
+  const load = useCallback((ex, limit) => {
+    setHist(h => ({ ...h, [ex.id]: { ...(h[ex.id] || { logs: [] }), limit, loading: true } }));
+    atAll(TBL.logs, [
+      ['filterByFormula', '{Exercise} = "' + esc(ex.name) + '"'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', limit],
+    ]).then(rs => setHist(h => ({ ...h, [ex.id]: { logs: rs.map(shapeLog), limit, loading: false } })))
+      .catch(() => setHist(h => ({ ...h, [ex.id]: { logs: [], limit, loading: false } })));
+  }, []);
+
+  const toggle = ex => {
+    if (open === ex.id) return setOpen(null);
+    setOpen(ex.id);
+    if (!hist[ex.id]) load(ex, 3);
+  };
+
+  const needle = q.trim().toLowerCase();
+  const match = e => !needle || e.name.toLowerCase().includes(needle);
+  const sorted = [...data.exercises].sort((a, b) => a.name.localeCompare(b.name));
+  const scheduled = sorted.filter(e => scheduledIds.has(e.id) && match(e));
+  const archived = sorted.filter(e => !scheduledIds.has(e.id) && match(e));
+
+  const row = (ex, grey) => {
+    const h = hist[ex.id];
+    const r = rowFor[ex.id];
+    return (
+      <React.Fragment key={ex.id}>
+        <div className={'ln' + (open === ex.id ? ' open' : '')} onClick={() => toggle(ex)}>
+          <div className="n" style={grey ? { color: 'var(--muted)' } : null}>{ex.name}</div>
+          <IconChev />
+        </div>
+        {open === ex.id && (
+          <div className="rx">
+            {r && r.prescription && <div><b>{r.prescription}</b>{r.dow ? ' — ' + r.dow : ''}</div>}
+            {ex.notes && <span className="cn">{ex.notes}</span>}
+            <div>
+              {h && h.loading && <span style={{ opacity: .6 }}>Loading…</span>}
+              {h && !h.loading && h.logs.length === 0 && <span style={{ opacity: .6 }}>No results yet</span>}
+              {h && !h.loading && h.logs.map((l, i) => (
+                <React.Fragment key={l.id}>{i > 0 && <br />}{fmtShort(l.date)} — {l.text}</React.Fragment>
+              ))}
+              {h && !h.loading && h.logs.length >= h.limit && h.limit < 10 && (
+                <div style={{ color: 'var(--red)', fontWeight: 600, marginTop: 2 }}
+                     onClick={e => { e.stopPropagation(); load(ex, 10); }}>Show more</div>
+              )}
+            </div>
+          </div>
+        )}
+      </React.Fragment>
+    );
+  };
+
+  return (
+    <React.Fragment>
+      <input className="search" value={q} placeholder="Search exercises" onChange={e => setQ(e.target.value)} />
+      {scheduled.length > 0 && <div className="card list">{scheduled.map(e => row(e, false))}</div>}
+      {archived.length > 0 && (
+        <React.Fragment>
+          <div className="jd" style={{ marginTop: 6 }}>Not scheduled</div>
+          <div className="card list">{archived.map(e => row(e, true))}</div>
+        </React.Fragment>
+      )}
+      {scheduled.length === 0 && archived.length === 0 && <div className="jd">No exercises match “{q}”.</div>}
+    </React.Fragment>
+  );
+}
+
+/* ───────────────────────── PRs ───────────────────────── */
+
+// Leading number or clock time from a Log Text, used for the trend bars.
+function parseVal(t) {
+  const s = String(t || '').trim();
+  let m = s.match(/^(\d+):(\d{2})(?::(\d{2}))?/);
+  if (m) return m[3] ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : (+m[1] * 60 + +m[2]);
+  m = s.match(/^(\d+(?:\.\d+)?)/);
+  return m ? +m[1] : null;
+}
+const looksLikeTime = t => /^\d+:\d{2}/.test(String(t || '').trim());
+const fmtSecs = n => { const s = Math.round(Math.abs(n)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+function PRsTab({ data, onOpen }) {
+  const [rows, setRows] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all(BENCHMARKS.map(name =>
+      atAll(TBL.logs, [
+        ['filterByFormula', '{Exercise} = "' + esc(name) + '"'],
+        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', 20],
+      ]).then(rs => ({ name, logs: rs.map(shapeLog) })).catch(() => ({ name, logs: null }))
+    )).then(r => { if (live) setRows(r); });
+    return () => { live = false; };
+  }, []);
+
+  const dayOf = useMemo(() => {
+    const m = {};
+    data.schedule.forEach(r => r.exercises.forEach(id => {
+      const n = (data.exById[id] || {}).name;
+      if (n && !m[n] && r.dow) m[n] = r.dow;
+    }));
+    return m;
+  }, [data]);
+
+  if (rows === null) return <div className="jd">Loading…</div>;
+
+  return (
+    <React.Fragment>
+      {rows.map(r => {
+        if (!r.logs || r.logs.length === 0) {
+          return (
+            <div className="pr" key={r.name}>
+              <h3>{r.name}</h3>
+              <div className="meta" style={{ marginTop: 6 }}>
+                {r.logs === null ? 'Could not load.' : 'No results logged yet.'}
+              </div>
+            </div>
+          );
+        }
+        const latest = r.logs[0];
+        const prev = r.logs[1];
+        const a = parseVal(latest.text), b = prev ? parseVal(prev.text) : null;
+        const diff = (a !== null && b !== null) ? a - b : null;
+        const time = looksLikeTime(latest.text);
+        const bars = r.logs.slice(0, 5).map(l => parseVal(l.text)).reverse().filter(v => v !== null);
+        const max = Math.max(...bars, 1);
+        return (
+          <div className="pr" key={r.name} onClick={() => onOpen(r)}>
+            <h3>{r.name}</h3>
+            <div className="big">
+              {latest.text}
+              {diff !== null && diff !== 0 &&
+                <small className={diff < 0 ? 'dn' : ''}>
+                  {diff > 0 ? '▲' : '▼'} {time ? fmtSecs(diff) : Math.abs(+diff.toFixed(2))}
+                </small>}
+            </div>
+            <div className="meta">{fmtShort(latest.date)}{dayOf[r.name] ? ' · ' + dayOf[r.name] : ''} · {r.logs.length} logged</div>
+            {bars.length > 1 && (
+              <div className="spark">{bars.map((v, i) => <i key={i} style={{ height: Math.max(8, Math.round(v / max * 100)) + '%' }} />)}</div>
+            )}
+          </div>
+        );
+      })}
+    </React.Fragment>
+  );
+}
+
+function PRHistorySheet({ pr, onClose }) {
+  return (
+    <Sheet title={pr.name} sub={pr.logs.length + ' results'} onClose={onClose}>
+      {pr.logs.map(l => (
+        <div className="hist" key={l.id}><b>{fmtShort(l.date)}</b>{l.text}</div>
+      ))}
+    </Sheet>
+  );
+}
+
+/* ───────────────────────── centre Log button ───────────────────────── */
+
+function QuickSheet({ onExercise, onNote, onClose }) {
+  return (
+    <Sheet title="Log" onClose={onClose}>
+      <div className="btns" style={{ flexDirection: 'column', marginTop: 8 }}>
+        <button className="btn" onClick={onExercise}><span className="ic">+</span>Log an exercise</button>
+        <button className="btn alt" onClick={onNote}>Add a day note</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function QuickLogSheet({ data, date, onSave, onClose }) {
+  const [q, setQ] = useState('');
+  const [pick, setPick] = useState(null);
+  const [text, setText] = useState('');
+  const [when, setWhen] = useState(date);
+
+  const needle = q.trim().toLowerCase();
+  const matches = needle
+    ? data.exercises.filter(e => e.name.toLowerCase().includes(needle)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
+    : [];
+
+  return (
+    <Sheet title="Log an exercise" sub={fmtSheetDate(when)} onClose={onClose}
+           action="Save result" disabled={!pick || !text.trim()}
+           onAction={() => onSave(when, pick.id, text.trim())}>
+      <div className="fld">
+        <div className="fn">Exercise</div>
+        <input className="in" value={pick ? pick.name : q} placeholder="Search exercises"
+               onChange={e => { setPick(null); setQ(e.target.value); }} />
+        {!pick && matches.map(e => (
+          <div className="ln" key={e.id} onClick={() => { setPick(e); setQ(e.name); }}>
+            <div className="n">{e.name}</div>
+          </div>
+        ))}
+      </div>
+      <div className="fld">
+        <div className="fn">Result</div>
+        <input className="in" value={text} placeholder="Result…" onChange={e => setText(e.target.value)} />
+      </div>
+      <div className="fld">
+        <div className="fn">Date</div>
+        <input className="in" type="date" value={when} onChange={e => e.target.value && setWhen(e.target.value)} />
+      </div>
+    </Sheet>
+  );
+}
+
 /* ───────────────────────── app ───────────────────────── */
 
 function Setup({ onDone }) {
@@ -631,10 +931,14 @@ function App() {
   const [failed, setFailed] = useState({});    // key -> retry thunk
   const [sheet, setSheet] = useState(null);
   const [theme, setTheme] = useState(document.documentElement.dataset.theme);
+  const [journal, setJournal] = useState({ logs: [], offset: undefined, more: true, loading: false, started: false });
 
   const today = todayISO();
   const daysRef = useRef(days);
   daysRef.current = days;
+  const journalRef = useRef(journal);
+  journalRef.current = journal;
+  const scrollRef = useRef(null);
 
   /* ---- load reference tables ---- */
   const loadCore = useCallback(async () => {
@@ -692,8 +996,8 @@ function App() {
   useEffect(() => {
     if (!data) return;
     const d = days[selected];
-    if (!d || !d.noteLoaded) loadDay(selected, true).catch(() => {});
-    const rest = weekDays(selected).filter(x => x !== selected && !days[x]);
+    if (!d || !d.loaded || !d.noteLoaded) loadDay(selected, true).catch(() => {});
+    const rest = weekDays(selected).filter(x => x !== selected && !(days[x] && days[x].loaded));
     rest.forEach((x, i) => setTimeout(() => loadDay(x, false).catch(() => {}), 120 * i));
   }, [data, selected]);  // eslint-disable-line
 
@@ -791,6 +1095,43 @@ function App() {
     }
   }, [patchDay, clearFail, markFail, onAuthLost]);
 
+  /* ---- journal ---- */
+  const loadJournal = useCallback(async (reset) => {
+    const cur = journalRef.current;
+    if (cur.loading) return;
+    setJournal(j => ({ ...j, loading: true, started: true }));
+    try {
+      const { records, offset } = await atPage(TBL.logs, [
+        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['pageSize', 100],
+      ], reset ? undefined : cur.offset);
+      setJournal(j => ({
+        logs: (reset ? [] : j.logs).concat(records.map(shapeLog)),
+        offset, more: !!offset, loading: false, started: true,
+      }));
+    } catch (e) {
+      if (e instanceof AuthError) return onAuthLost();
+      setJournal(j => ({ ...j, loading: false }));
+    }
+  }, [onAuthLost]);
+
+  // Day Notes for a date rendered in the Journal, fetched once.
+  const notesAsked = useRef(new Set());
+  const ensureNote = useCallback(date => {
+    if (notesAsked.current.has(date)) return;
+    const d = daysRef.current[date];
+    if (d && d.noteLoaded) return;
+    notesAsked.current.add(date);
+    atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + date + '"']])
+      .then(rs => patchDay(date, () => ({ note: rs[0] ? shapeNote(rs[0]) : null, noteLoaded: true })))
+      .catch(() => notesAsked.current.delete(date));
+  }, [patchDay]);
+
+  const openFromJournal = (date, lineKey) => {
+    setTab('week');
+    setSelected(date);
+    setOpenKey(lineKey || null);
+  };
+
   const noteLines = d => { const n = (days[d] || {}).note; return n && n.notes ? n.notes.split('\n').map(s => s.trim()).filter(Boolean) : []; };
 
   const toggleLine = line => {
@@ -837,6 +1178,20 @@ function App() {
 
   const failedFor = useCallback(line => failed[selected + '|' + line.exerciseId], [failed, selected]);
 
+  useEffect(() => {
+    if (tab === 'journal' && data && !journal.started) loadJournal(true);
+  }, [tab, data, journal.started, loadJournal]);
+
+  // Infinite scroll for the Journal.
+  const onScroll = e => {
+    if (tab !== 'journal') return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+      const j = journalRef.current;
+      if (j.more && !j.loading) loadJournal(false);
+    }
+  };
+
   /* ---- swipe weeks ---- */
   const touch = useRef(null);
   const onTouchStart = e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
@@ -847,6 +1202,9 @@ function App() {
     const dy = e.changedTouches[0].clientY - s.y;
     if (Math.abs(dx) > 60 && Math.abs(dy) < 45) { setSelected(addDays(selected, dx < 0 ? 7 : -7)); setOpenKey(null); }
   };
+
+  // Changing day or tab returns the card area to the top, as the mockup does.
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [selected, tab]);
 
   const toggleTheme = () => {
     const t = theme === 'dark' ? 'light' : 'dark';
@@ -876,7 +1234,7 @@ function App() {
                            onPick={d => { setSelected(d); setOpenKey(null); }} />
               ) : null} />
 
-      <div className="scroll" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="scroll" ref={scrollRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onScroll={onScroll}>
         {tab === 'week' && (
           <React.Fragment>
             {cards.length === 0 && <div className="card"><h3>Rest day</h3><div className="desc">Nothing scheduled for {dowName(selected)}.</div></div>}
@@ -897,13 +1255,17 @@ function App() {
                        }} />
           </React.Fragment>
         )}
-        {tab !== 'week' && <div className="jd">{title} — coming next</div>}
+        {tab === 'journal' &&
+          <JournalTab data={data} days={days} logs={journal.logs} more={journal.more} loading={journal.loading}
+                      onLoadMore={() => loadJournal(false)} onOpenLine={openFromJournal} ensureNote={ensureNote} />}
+        {tab === 'exercises' && <ExercisesTab data={data} />}
+        {tab === 'prs' && <PRsTab data={data} onOpen={pr => setSheet({ type: 'pr', pr })} />}
       </div>
 
       <div className="tabs">
         <button className={tab === 'week' ? 'on' : ''} onClick={() => setTab('week')}><IconWeek />Week</button>
         <button className={tab === 'journal' ? 'on' : ''} onClick={() => setTab('journal')}><IconJour />Journal</button>
-        <button className="mid"><div className="plus">+</div>Log</button>
+        <button className="mid" onClick={() => setSheet({ type: 'quick' })}><div className="plus">+</div>Log</button>
         <button className={tab === 'prs' ? 'on' : ''} onClick={() => setTab('prs')}><IconBolt />PRs</button>
         <button className={tab === 'exercises' ? 'on' : ''} onClick={() => setTab('exercises')}><IconBar />Exercises</button>
       </div>
@@ -917,6 +1279,16 @@ function App() {
         <NoteSheet date={selected}
                    onSave={v => { const cur = noteLines(selected); writeNotes(selected, cur.concat([v.trim()]).join('\n')); setSheet(null); }}
                    onClose={() => setSheet(null)} />}
+      {sheet && sheet.type === 'pr' &&
+        <PRHistorySheet pr={sheet.pr} onClose={() => setSheet(null)} />}
+      {sheet && sheet.type === 'quick' &&
+        <QuickSheet onClose={() => setSheet(null)}
+                    onExercise={() => setSheet({ type: 'quicklog' })}
+                    onNote={() => { setTab('week'); setSheet({ type: 'note' }); }} />}
+      {sheet && sheet.type === 'quicklog' &&
+        <QuickLogSheet data={data} date={selected}
+                       onSave={(when, exId, text) => { saveResult(when, exId, text); setSheet(null); }}
+                       onClose={() => setSheet(null)} />}
       {sheet && sheet.type === 'confirm' &&
         <ConfirmSheet line={sheet.line} text={sheet.text}
                       onConfirm={() => { removeResult(selected, sheet.line.exerciseId); setSheet(null); }}
