@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<meta name="theme-color" content="#1C1C1E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Ledger</title>
+<style>
+  :root{
+    --hdr:#1C1C1E; --hdr-text:#FFFFFF; --hdr-muted:#9A9AA0;
+    --bg:#F2F2F6; --card:#FFFFFF; --text:#1C1C1E; --muted:#6E6E73; --faint:#C7C7CC;
+    --red:#E5484D; --red-soft:#FDE8E8; --green:#2FA46A; --green-soft:#E3F6EA; --hair:#ECECF0;
+  }
+  [data-theme="dark"]{
+    --hdr:#000000; --bg:#0F0F11; --card:#1C1C1E; --text:#F2F2F5; --muted:#9A9AA0; --faint:#4A4A50;
+    --red:#F0575C; --red-soft:#3A1E20; --green:#4FC37F; --green-soft:#17302A; --hair:#2A2A2E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;font-size:17px;line-height:1.4;color:var(--text);background:#000;-webkit-font-smoothing:antialiased}
+  .phone{background:var(--bg);width:100%;max-width:430px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  @media (min-width:600px){ body{padding:24px 0} .phone{height:calc(100dvh - 48px);border-radius:44px;border:1px solid #333} }
+
+  /* header */
+  .hdr{background:var(--hdr);color:var(--hdr-text);padding:calc(env(safe-area-inset-top) + 14px) 20px 14px;border-radius:0 0 22px 22px}
+  .hdr .row1{display:flex;justify-content:space-between;align-items:center}
+  .hdr .race{font-size:13px;font-weight:600;color:var(--hdr-muted);display:flex;gap:6px;align-items:center}
+  .hdr .race b{color:var(--red)}
+  .hdr .icons{display:flex;gap:16px;align-items:center}
+  .hdr .icons svg{width:22px;height:22px;stroke:var(--hdr-text);fill:none;stroke-width:1.8}
+  .tog{width:40px;height:22px;border-radius:11px;background:#3A3A3E;position:relative}
+  .tog i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+  [data-theme="dark"] .tog{background:var(--red)} [data-theme="dark"] .tog i{left:20px}
+  .hdr .title{text-align:center;font-size:22px;font-weight:700;margin:16px 0 14px;letter-spacing:-.01em}
+  .hdr .title small{display:block;font-size:13px;font-weight:600;color:var(--hdr-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
+  .week{display:flex;justify-content:space-between}
+  .week div{text-align:center;flex:1;padding:4px 0;border-radius:10px}
+  .week span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--hdr-muted)}
+  .week b{display:block;font-size:19px;font-weight:600;margin-top:2px}
+  .week .on b, .week .on span{color:var(--red)}
+  .week .sel{background:#2C2C2E}
+  .week .dot{width:5px;height:5px;border-radius:50%;background:var(--green);margin:3px auto 0}
+
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom) + 90px)}
+
+  /* cards */
+  .card{background:var(--card);border-radius:18px;padding:16px 16px 14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h3{font-size:19px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+  .card h3 small{font-size:13px;font-weight:600;color:var(--muted)}
+  .card .desc{color:var(--muted);font-size:16px;margin-top:2px}
+  .lines{margin-top:10px}
+  .ln{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--hair);min-height:44px}
+  .ln .cb{width:22px;height:22px;border-radius:50%;border:2px solid var(--faint);flex:none;display:grid;place-items:center}
+  .ln .cb svg{width:12px;height:12px;color:#fff;display:none}
+  .ln.done .cb{background:var(--green);border-color:var(--green)}
+  .ln.done .cb svg{display:block}
+  .ln .n{flex:1;font-size:17px;font-weight:500}
+  .ln.done .n{color:var(--muted)}
+  .ln .chev{width:12px;height:12px;color:var(--faint);transition:transform .15s}
+  .ln.open .chev{transform:rotate(180deg)}
+  .rx{padding:0 0 10px 34px;color:var(--muted);font-size:16px}
+  .rx b{color:var(--text);font-weight:500}
+  .btns{display:flex;gap:10px;margin-top:12px}
+  .btn{flex:1;background:var(--red-soft);color:var(--red);font-weight:600;font-size:17px;border-radius:12px;padding:13px 10px;display:flex;align-items:center;justify-content:center;gap:8px;border:0;font-family:inherit;min-height:44px}
+  .btn .ic{width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:18px;line-height:1}
+  .btn.alt{background:var(--hair);color:var(--text)}
+  .btn.alt svg{width:18px;height:18px}
+  .card.notes .btn{background:var(--green-soft);color:var(--green)}
+  .card.notes .btn .ic{background:var(--green)}
+  .notelines p{font-size:16px;padding:8px 0;border-top:1px solid var(--hair)}
+  .notelines p:first-child{border-top:0;padding-top:4px}
+
+  /* journal */
+  .jd{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 6px 8px}
+  .jl{padding:9px 0;border-top:1px solid var(--hair)}
+  .jl:first-of-type{border-top:0}
+  .card h3 + .jl{border-top:0;margin-top:6px}
+  .jn{font-weight:500;font-size:17px}
+  .jt{color:var(--muted);font-size:15px;margin-top:1px}
+  .jl.skip .jn{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+
+  /* exercises */
+  .search{background:var(--card);border-radius:14px;padding:12px 16px;color:var(--text);font-size:17px;margin-bottom:12px;border:0;width:100%;font-family:inherit}
+  .search::placeholder{color:var(--faint)}
+  .card.list{padding:4px 16px}
+  .card.list .ln:first-child{border-top:0}
+  .card.list .ln{min-height:50px}
+  .rx .cn{color:var(--text);display:block;margin:4px 0 6px}
+
+  /* PRs */
+  .pr{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px}
+  .pr h3{font-size:19px;font-weight:700}
+  .pr .big{font-size:34px;font-weight:700;letter-spacing:-.02em;margin-top:4px}
+  .pr .big small{font-size:14px;font-weight:600;color:var(--green);margin-left:8px}
+  .pr .big small.dn{color:var(--red)}
+  .pr .meta{color:var(--muted);font-size:14px;margin-top:2px}
+  .spark{display:flex;align-items:flex-end;gap:5px;height:44px;margin-top:12px}
+  .spark i{flex:1;background:var(--faint);border-radius:3px 3px 0 0}
+  .spark i:last-child{background:var(--red)}
+
+  /* sheet */
+  .shade{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:22px 22px 0 0;padding:12px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:80%;overflow-y:auto}
+  .sheet .grab{width:38px;height:5px;border-radius:3px;background:var(--faint);margin:0 auto 14px}
+  .sheet h3{font-size:20px;font-weight:700}
+  .sheet .sub{color:var(--muted);font-size:14px;margin-bottom:8px}
+  .fld{padding:12px 0;border-top:1px solid var(--hair)}
+  .fld .fn{font-weight:600;font-size:16px}
+  .fld .rx{display:block;padding:0;font-size:14px;margin-top:1px}
+  .fld .in{margin-top:8px;background:var(--bg);border-radius:12px;padding:11px 14px;font-size:17px;min-height:46px;border:0;width:100%;font-family:inherit;color:var(--text);display:block}
+  .fld .in::placeholder{color:var(--faint)}
+  .sheet .go{margin-top:14px;background:var(--red);color:#fff;font-weight:700;font-size:17px;text-align:center;border-radius:14px;padding:15px;border:0;width:100%;font-family:inherit}
+
+  /* tabs */
+  .tabs{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--hair);display:flex;padding:8px 0 calc(env(safe-area-inset-bottom) + 6px)}
+  .tabs button{flex:1;border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabs button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8}
+  .tabs button.on{color:var(--red)}
+  .tabs .plus{width:40px;height:40px;border-radius:50%;background:var(--muted);color:#fff;display:grid;place-items:center;font-size:26px;line-height:1;margin-top:-6px}
+  .tabs button.mid{gap:2px}
+
+  /* setup / status */
+  .setup{padding:40px 24px;color:var(--text)}
+  .setup h1{font-size:24px;font-weight:700;margin-bottom:6px}
+  .setup p{color:var(--muted);font-size:15px;margin-bottom:18px}
+  .setup input{width:100%;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:13px 14px;font:inherit;font-size:16px;color:var(--text)}
+  .setup button{margin-top:12px;width:100%;background:var(--red);color:#fff;border:0;border-radius:12px;padding:15px;font:inherit;font-weight:700;font-size:17px}
+  .setup .err{color:var(--red);font-size:14px;margin-top:10px}
+  .boot{display:grid;place-items:center;height:100%;color:var(--muted);font-size:15px;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ───────────────────────── config ───────────────────────── */
+
+const BASE = 'appmqPkBzBzcKlrce';
+const TBL = {
+  exercises: 'tblQ39nQ8p8HRSsIC',
+  schedule : 'tblZP0Fg1dKWJzII2',
+  logs     : 'tblvJWkX10l1Fs6iE',
+  races    : 'tblusBLP1tM1sR7DH',
+  dayNotes : 'tblxTF4kmjHnGv4fx',
+};
+
+// Benchmark exercises shown on the PRs tab. Names must match Exercises.Name exactly.
+const BENCHMARKS = [
+  'Trap Bar Deadlift',
+  'Power Clean',
+  'GHD Sorenson Hold',
+  'Weighted Step-Down Negatives',
+];
+
+const LS_PAT = 'ledger.pat';
+const LS_THEME = 'ledger.theme';
+const STALE_MS = 60 * 60 * 1000;   // refresh Schedule on foreground after 1 hr
+
+/* ───────────────────────── dates ───────────────────────── */
+
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const parseISO = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const todayISO = () => iso(new Date());
+const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate()+n); return iso(d); };
+const dowName = s => DOW[parseISO(s).getDay()];
+const mondayOf = s => { const d = parseISO(s); const wd = d.getDay(); d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd)); return iso(d); };
+const weekDays = s => { const m = mondayOf(s); return Array.from({length:7}, (_,i) => addDays(m, i)); };
+const fmtLong = s => { const d = parseISO(s); return MON[d.getMonth()] + ' ' + d.getDate(); };
+const fmtShort = s => { const d = parseISO(s); return MON3[d.getMonth()] + ' ' + d.getDate(); };
+const fmtJournal = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON3[d.getMonth()] + ' ' + d.getDate(); };
+const daysUntil = s => Math.round((parseISO(s) - parseISO(todayISO())) / 86400000);
+
+/* ───────────────────────── Airtable REST ───────────────────────── */
+
+class AuthError extends Error {}
+
+let PAT = localStorage.getItem(LS_PAT) || '';
+const setPat = v => { PAT = v; v ? localStorage.setItem(LS_PAT, v) : localStorage.removeItem(LS_PAT); };
+
+const qs = pairs => pairs.map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+
+async function at(table, { method = 'GET', params = [], body } = {}) {
+  const url = 'https://api.airtable.com/v0/' + BASE + '/' + table + (params.length ? '?' + qs(params) : '');
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization: 'Bearer ' + PAT, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401 || res.status === 403) { setPat(''); throw new AuthError('Airtable rejected the token'); }
+  if (!res.ok) throw new Error('Airtable ' + res.status + ': ' + (await res.text()).slice(0, 200));
+  return res.json();
+}
+
+async function atAll(table, params = []) {
+  const out = [];
+  let offset;
+  do {
+    const p = offset ? params.concat([['offset', offset]]) : params;
+    const j = await at(table, { params: p });
+    out.push(...j.records);
+    offset = j.offset;
+  } while (offset);
+  return out;
+}
+
+const esc = s => String(s).replace(/"/g, '\\"');
+
+/* ───────────────────────── shaping ───────────────────────── */
+
+const shapeExercise = r => ({ id: r.id, name: r.fields['Name'] || '', notes: r.fields['Coaching Notes'] || '' });
+
+const shapeScheduleRow = r => ({
+  id: r.id,
+  dow: r.fields['Day of Week'] || '',
+  order: r.fields['Order'] == null ? 1e9 : r.fields['Order'],
+  section: r.fields['Section'] || '',
+  block: (r.fields['Block'] || '').trim(),
+  weekOf: r.fields['Week Of'] || '',
+  exercises: r.fields['Exercise'] || [],
+  prescription: r.fields['Prescription'] || '',
+});
+
+const shapeLog = r => ({
+  id: r.id,
+  exerciseId: (r.fields['Exercise'] || [])[0] || '',
+  date: r.fields['Log Date'] || '',
+  text: r.fields['Log Text'] || '',
+});
+
+const shapeRace = r => ({ id: r.id, name: r.fields['Name'] || '', date: r.fields['Date'] || '', status: r.fields['Status'] || '' });
+
+const shapeNote = r => ({ id: r.id, date: r.fields['Date'] || '', notes: r.fields['Notes'] || '' });
+
+/* ───────────────────────── schedule resolution ───────────────────────── */
+
+// For a date, pick the week's rows: a custom week (Week Of = that Monday) fully
+// replaces the template (Week Of blank). Then filter to the day and sort by Order.
+function rowsForDate(schedule, dateISO) {
+  const monday = mondayOf(dateISO);
+  const custom = schedule.filter(r => r.weekOf === monday);
+  const pool = custom.length ? custom : schedule.filter(r => !r.weekOf);
+  const dow = dowName(dateISO);
+  return pool.filter(r => r.dow === dow).sort((a, b) => a.order - b.order);
+}
+
+// Group a day's rows into cards by Block, falling back to Section. One line per
+// linked exercise. Card order follows the lowest Order inside the card.
+function buildCards(rows, exById) {
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = r.block || r.section || 'Other';
+    if (!byKey.has(key)) byKey.set(key, { name: key, groupedBy: r.block ? 'Block' : 'Section', minOrder: r.order, rows: [] });
+    const c = byKey.get(key);
+    if (r.order < c.minOrder) c.minOrder = r.order;
+    c.rows.push(r);
+  }
+  const cards = [...byKey.values()];
+  for (const c of cards) {
+    // A leading row whose single linked exercise is named after the block is a
+    // description row: its Prescription becomes the card's prose, and it is not
+    // rendered as a line of its own.
+    const first = c.rows[0];
+    const firstNames = first.exercises.map(id => (exById[id] || {}).name);
+    if (firstNames.length === 1 && firstNames[0] === c.name && first.prescription) {
+      c.description = first.prescription;
+      c.rows = c.rows.slice(1);
+    }
+    c.lines = [];
+    for (const r of c.rows) {
+      for (const id of r.exercises) {
+        c.lines.push({
+          key: r.id + ':' + id,
+          rowId: r.id,
+          exerciseId: id,
+          name: (exById[id] || {}).name || '(unknown exercise)',
+          prescription: r.prescription,
+        });
+      }
+    }
+  }
+  cards.sort((a, b) => a.minOrder - b.minOrder);
+  return cards;
+}
+
+/* ───────────────────────── debug helper ───────────────────────── */
+
+// window.LEDGER.day('2026-09-21') prints the resolved cards for any date.
+function dumpDay(label, dateISO, schedule, exById, logs) {
+  const rows = rowsForDate(schedule, dateISO);
+  const cards = buildCards(rows, exById);
+  const custom = schedule.some(r => r.weekOf === mondayOf(dateISO));
+  const doneIds = new Set((logs || []).map(l => l.exerciseId));
+  console.group('%c' + label + ' — ' + dateISO + ' (' + dowName(dateISO) + ')', 'font-weight:700;color:#E5484D');
+  console.log('week of ' + mondayOf(dateISO) + ' · ' + (custom ? 'CUSTOM week rows' : 'template rows') +
+              ' · ' + rows.length + ' schedule rows → ' + cards.length + ' cards');
+  for (const c of cards) {
+    const done = c.lines.filter(l => doneIds.has(l.exerciseId)).length;
+    console.group('%c' + c.name + '  ' + done + ' / ' + c.lines.length +
+                  '%c   [by ' + c.groupedBy + ', order ' + c.minOrder + ']',
+                  'font-weight:700', 'color:#9A9AA0;font-weight:400');
+    if (c.description) console.log('%cdesc:%c ' + c.description, 'color:#9A9AA0', '');
+    console.table(c.lines.map(l => ({ '✓': doneIds.has(l.exerciseId) ? '✓' : '', exercise: l.name, prescription: l.prescription })));
+    console.groupEnd();
+  }
+  console.groupEnd();
+  return cards;
+}
+
+/* ───────────────────────── icons ───────────────────────── */
+
+const IconCal   = () => <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>;
+const IconCheck = () => <svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-6" fill="none" stroke="currentColor" strokeWidth="2.2"/></svg>;
+const IconChev  = () => <svg className="chev" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8"/></svg>;
+const IconClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
+const IconWeek  = () => <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>;
+const IconJour  = () => <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>;
+const IconBolt  = () => <svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>;
+const IconBar   = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg>;
+
+/* ───────────────────────── header ───────────────────────── */
+
+function Header({ race, label, title, strip, theme, onTheme, onDate }) {
+  const dateRef = useRef(null);
+  const openPicker = () => {
+    const el = dateRef.current;
+    if (!el) return;
+    if (el.showPicker) { try { el.showPicker(); return; } catch (e) {} }
+    el.click();
+  };
+  return (
+    <div className="hdr">
+      <div className="row1">
+        <div className="race">
+          {race ? <React.Fragment>⚑ <b>{race.name}</b> · {race.days} days</React.Fragment> : <span>&nbsp;</span>}
+        </div>
+        <div className="icons">
+          <span onClick={openPicker} style={{ display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'end' }} role="button" aria-label="Pick a date">
+            <IconCal />
+          </span>
+          <input ref={dateRef} type="date" onChange={e => e.target.value && onDate(e.target.value)}
+                 style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} tabIndex={-1} />
+          <div className="tog" onClick={onTheme} role="button" aria-label="Toggle theme"><i /></div>
+        </div>
+      </div>
+      <div className="title"><small>{label}</small>{title}</div>
+      {strip}
+    </div>
+  );
+}
+
+function WeekStrip({ days, selected, today, dotDays, onPick }) {
+  return (
+    <div className="week">
+      {days.map(d => {
+        const cls = [parseISO(d).getTime() === parseISO(today).getTime() ? 'on' : '', d === selected ? 'sel' : ''].filter(Boolean).join(' ');
+        return (
+          <div key={d} className={cls} onClick={() => onPick(d)}>
+            <span>{DOW[parseISO(d).getDay()].slice(0, 3).toUpperCase()}</span>
+            <b>{parseISO(d).getDate()}</b>
+            {dotDays.has(d) && <div className="dot" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ───────────────────────── week tab ───────────────────────── */
+
+function Line({ line, done, open, onOpen, onToggle, detail }) {
+  return (
+    <React.Fragment>
+      <div className={'ln' + (done ? ' done' : '') + (open ? ' open' : '')} onClick={onOpen}>
+        <div className="cb" onClick={e => { e.stopPropagation(); onToggle(); }}><IconCheck /></div>
+        <div className="n">{line.name}</div>
+        <IconChev />
+      </div>
+      {open && (
+        <div className="rx">
+          {line.prescription && <b>{line.prescription}</b>}
+          {detail === null && <React.Fragment>{line.prescription && <br />}<span style={{ opacity: .6 }}>Loading history…</span></React.Fragment>}
+          {detail && detail.current && <React.Fragment>{line.prescription && <br />}{detail.currentLabel}: {detail.current}</React.Fragment>}
+          {detail && detail.previous.map((p, i) => (
+            <React.Fragment key={i}>{(line.prescription || detail.current || i > 0) && <br />}Last: {fmtShort(p.date)} — {p.text}</React.Fragment>
+          ))}
+          {detail && !detail.current && !detail.previous.length && !line.prescription && <span style={{ opacity: .6 }}>No prescription or history</span>}
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory }) {
+  const done = card.lines.filter(l => logsByEx[l.exerciseId]).length;
+  return (
+    <div className="card">
+      <h3>{card.name} <small>{done} / {card.lines.length}</small></h3>
+      {card.description && <div className="desc">{card.description}</div>}
+      <div className="lines">
+        {card.lines.map(l => (
+          <Line key={l.key} line={l} done={!!logsByEx[l.exerciseId]}
+                open={openKey === l.key}
+                onOpen={() => setOpenKey(openKey === l.key ? null : l.key)}
+                onToggle={() => onToggle(l)}
+                detail={openKey === l.key ? detailFor(l) : undefined} />
+        ))}
+      </div>
+      <div className="btns">
+        <button className="btn" onClick={() => onLogResult(card)}><span className="ic">+</span>Log Result</button>
+        <button className="btn alt" onClick={() => onHistory(card)}><IconClock />History</button>
+      </div>
+    </div>
+  );
+}
+
+function NotesCard({ note, onAdd, onDelete }) {
+  const lines = (note && note.notes ? note.notes.split('\n') : []).map(s => s.trim()).filter(Boolean);
+  const [swiped, setSwiped] = useState(null);
+  const start = useRef(null);
+  return (
+    <div className="card notes">
+      <h3>Notes</h3>
+      <div className="notelines">
+        {lines.length === 0 && <p style={{ color: 'var(--faint)' }}>No notes yet</p>}
+        {lines.map((t, i) => (
+          <p key={i}
+             onTouchStart={e => { start.current = e.touches[0].clientX; }}
+             onTouchEnd={e => {
+               const dx = e.changedTouches[0].clientX - (start.current || 0);
+               if (dx < -60) setSwiped(i); else if (dx > 20) setSwiped(null);
+             }}
+             style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+            <span>{t}</span>
+            {swiped === i && (
+              <button onClick={() => { setSwiped(null); onDelete(i); }}
+                      style={{ border: 0, background: 'var(--red)', color: '#fff', borderRadius: 8, padding: '6px 12px', font: 'inherit', fontSize: 14, fontWeight: 600, flex: 'none' }}>
+                Delete
+              </button>
+            )}
+          </p>
+        ))}
+      </div>
+      <div className="btns"><button className="btn" onClick={onAdd}><span className="ic">+</span>Add Note</button></div>
+    </div>
+  );
+}
+
+/* ───────────────────────── app ───────────────────────── */
+
+function Setup({ onDone }) {
+  const [v, setV] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const token = v.trim();
+    if (!token) return;
+    setBusy(true); setErr('');
+    setPat(token);
+    try {
+      await at(TBL.exercises, { params: [['maxRecords', 1]] });
+      onDone();
+    } catch (e) {
+      setPat('');
+      setErr(e instanceof AuthError ? 'That token was rejected. Check its scopes and base access.' : String(e.message || e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="setup">
+      <h1>Ledger</h1>
+      <p>Paste an Airtable personal access token with <code>data.records:read</code> and <code>data.records:write</code> on the Training base. It is stored on this device only.</p>
+      <input type="password" value={v} placeholder="pat…" autoCapitalize="off" autoCorrect="off" spellCheck="false"
+             onChange={e => setV(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
+      <button onClick={submit} disabled={busy}>{busy ? 'Checking…' : 'Connect'}</button>
+      {err && <div className="err">{err}</div>}
+    </div>
+  );
+}
+
+function App() {
+  const [ready, setReady] = useState(!!PAT);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [tab, setTab] = useState('week');
+  const [selected, setSelected] = useState(todayISO());
+  const [days, setDays] = useState({});        // iso -> { logs, note, loaded }
+  const [history, setHistory] = useState({});  // exerciseId -> [{date,text}] (2 most recent, excluding selected date)
+  const [openKey, setOpenKey] = useState(null);
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme);
+
+  const today = todayISO();
+
+  /* ---- load reference tables ---- */
+  const loadCore = useCallback(async () => {
+    const [ex, sch, races] = await Promise.all([atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races)]);
+    const exercises = ex.map(shapeExercise);
+    const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
+    const schedule = sch.map(shapeScheduleRow);
+    const payload = { exercises, exById, schedule, races: races.map(shapeRace), fetchedAt: Date.now() };
+    setData(payload);
+    window.LEDGER = { ...payload, rowsForDate, buildCards, day: d => dumpDay('Day', d, schedule, exById, null) };
+    return payload;
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    loadCore().catch(e => {
+      if (!live) return;
+      if (e instanceof AuthError) { setReady(false); setError('Token rejected — enter it again.'); }
+      else setError(String(e.message || e));
+    });
+    return () => { live = false; };
+  }, [ready, loadCore]);
+
+  /* ---- refresh Schedule when the app comes back to the foreground ---- */
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || !data) return;
+      if (Date.now() - data.fetchedAt > STALE_MS) loadCore().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [data, loadCore]);
+
+  /* ---- per-date logs + day note, cached ---- */
+  const loadDay = useCallback(async (d, withNote) => {
+    const [logs, notes] = await Promise.all([
+      atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']]),
+      withNote ? atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']]) : Promise.resolve(null),
+    ]);
+    setDays(prev => ({
+      ...prev,
+      [d]: {
+        logs: logs.map(shapeLog),
+        note: notes ? (notes[0] ? shapeNote(notes[0]) : null) : (prev[d] ? prev[d].note : null),
+        loaded: true,
+        noteLoaded: !!notes || (prev[d] ? prev[d].noteLoaded : false),
+      },
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    const d = days[selected];
+    if (!d || !d.noteLoaded) loadDay(selected, true).catch(() => {});
+    // prefetch the rest of the visible week for the strip dots
+    const rest = weekDays(selected).filter(x => x !== selected && !days[x]);
+    rest.forEach((x, i) => setTimeout(() => loadDay(x, false).catch(() => {}), 120 * i));
+  }, [data, selected]);  // eslint-disable-line
+
+  /* ---- derived ---- */
+  const cards = useMemo(() => {
+    if (!data) return [];
+    return buildCards(rowsForDate(data.schedule, selected), data.exById);
+  }, [data, selected]);
+
+  const dayState = days[selected];
+  const logsByEx = useMemo(() => {
+    const m = {};
+    (dayState ? dayState.logs : []).forEach(l => { if (l.exerciseId) m[l.exerciseId] = l; });
+    return m;
+  }, [dayState]);
+
+  const dotDays = useMemo(() => {
+    const s = new Set();
+    weekDays(selected).forEach(d => { if (days[d] && days[d].logs.length) s.add(d); });
+    return s;
+  }, [days, selected]);
+
+  const nextRace = useMemo(() => {
+    if (!data) return null;
+    const up = data.races
+      .filter(r => r.date && r.date >= today && r.status !== 'Completed')
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return up ? { name: up.name, days: daysUntil(up.date) } : null;
+  }, [data, today]);
+
+  /* ---- line dropdown history ---- */
+  useEffect(() => {
+    if (!openKey || !data) return;
+    const line = cards.flatMap(c => c.lines).find(l => l.key === openKey);
+    if (!line) return;
+    const k = line.exerciseId + '|' + selected;
+    if (history[k] !== undefined) return;
+    setHistory(h => ({ ...h, [k]: null }));
+    const name = (data.exById[line.exerciseId] || {}).name || '';
+    atAll(TBL.logs, [
+      ['filterByFormula', 'AND({Exercise} = "' + esc(name) + '", {Log Date} != "' + selected + '")'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+      ['maxRecords', 2],
+    ]).then(rs => setHistory(h => ({ ...h, [k]: rs.map(shapeLog) })))
+      .catch(() => setHistory(h => ({ ...h, [k]: [] })));
+  }, [openKey, data, selected]);  // eslint-disable-line
+
+  const detailFor = useCallback(line => {
+    const k = line.exerciseId + '|' + selected;
+    const prev = history[k];
+    if (prev === undefined || prev === null) return null;
+    const cur = logsByEx[line.exerciseId];
+    return {
+      current: cur ? cur.text : '',
+      currentLabel: selected === today ? 'Today' : fmtShort(selected),
+      previous: prev,
+    };
+  }, [history, logsByEx, selected, today]);
+
+  /* ---- swipe weeks ---- */
+  const touch = useRef(null);
+  const onTouchStart = e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+  const onTouchEnd = e => {
+    const s = touch.current; touch.current = null;
+    if (!s || tab !== 'week') return;
+    const dx = e.changedTouches[0].clientX - s.x;
+    const dy = e.changedTouches[0].clientY - s.y;
+    if (Math.abs(dx) > 60 && Math.abs(dy) < 45) setSelected(addDays(selected, dx < 0 ? 7 : -7));
+  };
+
+  const toggleTheme = () => {
+    const t = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem(LS_THEME, t);
+    setTheme(t);
+  };
+
+  if (!ready) return <div className="phone"><Setup onDone={() => { setError(''); setReady(true); }} /></div>;
+  if (error) return <div className="phone"><div className="boot"><span style={{ color: 'var(--red)' }}>{error}</span></div></div>;
+  if (!data) return <div className="phone"><div className="boot">Loading…</div></div>;
+
+  const TITLES = {
+    week: [dowName(selected), fmtLong(selected)],
+    journal: ['Training log', 'Journal'],
+    prs: ['Benchmarks', 'Personal Records'],
+    exercises: ['Library', 'Exercises'],
+  };
+  const [label, title] = TITLES[tab];
+
+  return (
+    <div className="phone">
+      <Header race={nextRace} label={label} title={title} theme={theme} onTheme={toggleTheme}
+              onDate={d => { setTab('week'); setSelected(d); setOpenKey(null); }}
+              strip={tab === 'week' ? (
+                <WeekStrip days={weekDays(selected)} selected={selected} today={today} dotDays={dotDays}
+                           onPick={d => { setSelected(d); setOpenKey(null); }} />
+              ) : null} />
+
+      <div className="scroll" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {tab === 'week' && (
+          <React.Fragment>
+            {cards.length === 0 && <div className="card"><h3>Rest day</h3><div className="desc">Nothing scheduled for {dowName(selected)}.</div></div>}
+            {cards.map(c => (
+              <BlockCard key={c.name} card={c} logsByEx={logsByEx}
+                         openKey={openKey} setOpenKey={setOpenKey} detailFor={detailFor}
+                         onToggle={() => {}} onLogResult={() => {}} onHistory={() => {}} />
+            ))}
+            <NotesCard note={dayState ? dayState.note : null} onAdd={() => {}} onDelete={() => {}} />
+          </React.Fragment>
+        )}
+        {tab !== 'week' && <div className="jd">{title} — coming next</div>}
+      </div>
+
+      <div className="tabs">
+        <button className={tab === 'week' ? 'on' : ''} onClick={() => setTab('week')}><IconWeek />Week</button>
+        <button className={tab === 'journal' ? 'on' : ''} onClick={() => setTab('journal')}><IconJour />Journal</button>
+        <button className="mid"><div className="plus">+</div>Log</button>
+        <button className={tab === 'prs' ? 'on' : ''} onClick={() => setTab('prs')}><IconBolt />PRs</button>
+        <button className={tab === 'exercises' ? 'on' : ''} onClick={() => setTab('exercises')}><IconBar />Exercises</button>
+      </div>
+    </div>
+  );
+}
+
+const savedTheme = localStorage.getItem(LS_THEME);
+document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
