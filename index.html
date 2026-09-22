@@ -65,6 +65,9 @@
   .ln .chev{width:12px;height:12px;color:var(--faint);transition:transform .15s}
   .ln.open .chev{transform:rotate(180deg)}
   .rx{padding:0 0 10px 34px;color:var(--muted);font-size:16px}
+  .ln .retry{color:var(--red);font-size:14px;font-weight:600;flex:none;padding:0 4px}
+  .sheet .hist{padding:10px 0;border-top:1px solid var(--hair);font-size:15px;color:var(--muted)}
+  .sheet .hist b{display:block;color:var(--text);font-weight:600;font-size:16px;margin-bottom:2px}
   .rx b{color:var(--text);font-weight:500}
   .btns{display:flex;gap:10px;margin-top:12px}
   .btn{flex:1;background:var(--red-soft);color:var(--red);font-weight:600;font-size:17px;border-radius:12px;padding:13px 10px;display:flex;align-items:center;justify-content:center;gap:8px;border:0;font-family:inherit;min-height:44px}
@@ -298,6 +301,25 @@ function buildCards(rows, exById) {
   return cards;
 }
 
+/* ───────────────────────── writes ───────────────────────── */
+
+const createLog = (exerciseId, date, text) =>
+  at(TBL.logs, { method: 'POST', body: { records: [{ fields: { 'Exercise': [exerciseId], 'Log Date': date, 'Log Text': text } }] } });
+const updateLog = (id, text) =>
+  at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields: { 'Log Text': text } }] } });
+const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
+
+const createNote = (date, notes) =>
+  at(TBL.dayNotes, { method: 'POST', body: { records: [{ fields: { 'Date': date, 'Notes': notes } }] } });
+const updateNote = (id, notes) =>
+  at(TBL.dayNotes, { method: 'PATCH', body: { records: [{ id, fields: { 'Notes': notes } }] } });
+
+// Every write gets exactly one retry; after that the caller surfaces a Retry link.
+const attempt = async fn => {
+  try { return await fn(); }
+  catch (e) { if (e instanceof AuthError) throw e; return fn(); }
+};
+
 /* ───────────────────────── debug helper ───────────────────────── */
 
 // window.LEDGER.day('2026-09-21') prints the resolved cards for any date.
@@ -333,9 +355,108 @@ const IconJour  = () => <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" he
 const IconBolt  = () => <svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>;
 const IconBar   = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg>;
 
+const fmtSheetDate = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); };
+
+/* ───────────────────────── sheets ───────────────────────── */
+
+function Sheet({ title, sub, children, onClose, action, onAction, disabled }) {
+  return (
+    <React.Fragment>
+      <div className="shade" onClick={onClose} />
+      <div className="sheet">
+        <div className="grab" onClick={onClose} />
+        <h3>{title}</h3>
+        {sub && <div className="sub">{sub}</div>}
+        {children}
+        {action && (
+          <button className="go" onClick={onAction} disabled={disabled} style={disabled ? { opacity: .45 } : null}>
+            {action}
+          </button>
+        )}
+      </div>
+    </React.Fragment>
+  );
+}
+
+const uniqueLines = card => {
+  const out = [], seen = new Set();
+  card.lines.forEach(l => { if (!seen.has(l.exerciseId)) { seen.add(l.exerciseId); out.push(l); } });
+  return out;
+};
+
+function LogSheet({ card, date, logsByEx, onSave, onClose }) {
+  const lines = useMemo(() => uniqueLines(card), [card]);
+  const [vals, setVals] = useState(() =>
+    Object.fromEntries(lines.map(l => [l.exerciseId, (logsByEx[l.exerciseId] || {}).text || ''])));
+  const n = lines.filter(l => (vals[l.exerciseId] || '').trim()).length;
+  return (
+    <Sheet title={'Log Result — ' + card.name} sub={fmtSheetDate(date)} onClose={onClose}
+           action={'Save ' + n + ' result' + (n === 1 ? '' : 's')} onAction={() => onSave(vals)} disabled={n === 0}>
+      {lines.map(l => (
+        <div className="fld" key={l.exerciseId}>
+          <div className="fn">{l.name}</div>
+          {l.prescription && <div className="rx">{l.prescription}</div>}
+          <input className="in" value={vals[l.exerciseId]} placeholder="Result…"
+                 onChange={e => setVals(v => ({ ...v, [l.exerciseId]: e.target.value }))} />
+        </div>
+      ))}
+    </Sheet>
+  );
+}
+
+function HistorySheet({ card, onClose }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let live = true;
+    Promise.all(uniqueLines(card).map(l =>
+      atAll(TBL.logs, [
+        ['filterByFormula', '{Exercise} = "' + esc(l.name) + '"'],
+        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', 5],
+      ]).then(rs => ({ line: l, logs: rs.map(shapeLog) })).catch(() => ({ line: l, logs: null }))
+    )).then(r => { if (live) setRows(r); });
+    return () => { live = false; };
+  }, [card]);
+  return (
+    <Sheet title={'History — ' + card.name} sub="Last 5 results" onClose={onClose}>
+      {rows === null && <div className="hist" style={{ borderTop: 0 }}>Loading…</div>}
+      {rows && rows.map(r => (
+        <div className="hist" key={r.line.exerciseId}>
+          <b>{r.line.name}</b>
+          {r.logs === null && <div>Could not load.</div>}
+          {r.logs && r.logs.length === 0 && <div style={{ color: 'var(--faint)' }}>No results yet</div>}
+          {r.logs && r.logs.map(l => <div key={l.id}>{fmtShort(l.date)} — {l.text}</div>)}
+        </div>
+      ))}
+    </Sheet>
+  );
+}
+
+function NoteSheet({ date, onSave, onClose }) {
+  const [v, setV] = useState('');
+  return (
+    <Sheet title="Add Note" sub={fmtSheetDate(date)} onClose={onClose}
+           action="Save note" onAction={() => onSave(v)} disabled={!v.trim()}>
+      <div className="fld">
+        <input className="in" value={v} placeholder="Note…" autoFocus
+               onChange={e => setV(e.target.value)}
+               onKeyDown={e => { if (e.key === 'Enter' && v.trim()) onSave(v); }} />
+      </div>
+    </Sheet>
+  );
+}
+
+function ConfirmSheet({ line, text, onConfirm, onClose }) {
+  return (
+    <Sheet title="Remove this result?" sub={line.name} onClose={onClose}
+           action="Delete result" onAction={onConfirm}>
+      <div className="fld"><div className="rx" style={{ fontSize: 16, paddingBottom: 0 }}>{text}</div></div>
+    </Sheet>
+  );
+}
+
 /* ───────────────────────── header ───────────────────────── */
 
-function Header({ race, label, title, strip, theme, onTheme, onDate }) {
+function Header({ race, label, title, strip, onTheme, onDate }) {
   const dateRef = useRef(null);
   const openPicker = () => {
     const el = dateRef.current;
@@ -350,11 +471,13 @@ function Header({ race, label, title, strip, theme, onTheme, onDate }) {
           {race ? <React.Fragment>⚑ <b>{race.name}</b> · {race.days} days</React.Fragment> : <span>&nbsp;</span>}
         </div>
         <div className="icons">
-          <span onClick={openPicker} style={{ display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'end' }} role="button" aria-label="Pick a date">
+          <span onClick={openPicker} role="button" aria-label="Pick a date"
+                style={{ display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'end' }}>
             <IconCal />
           </span>
-          <input ref={dateRef} type="date" onChange={e => e.target.value && onDate(e.target.value)}
-                 style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} tabIndex={-1} />
+          <input ref={dateRef} type="date" tabIndex={-1} aria-hidden="true"
+                 onChange={e => e.target.value && onDate(e.target.value)}
+                 style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} />
           <div className="tog" onClick={onTheme} role="button" aria-label="Toggle theme"><i /></div>
         </div>
       </div>
@@ -368,7 +491,7 @@ function WeekStrip({ days, selected, today, dotDays, onPick }) {
   return (
     <div className="week">
       {days.map(d => {
-        const cls = [parseISO(d).getTime() === parseISO(today).getTime() ? 'on' : '', d === selected ? 'sel' : ''].filter(Boolean).join(' ');
+        const cls = [d === today ? 'on' : '', d === selected ? 'sel' : ''].filter(Boolean).join(' ');
         return (
           <div key={d} className={cls} onClick={() => onPick(d)}>
             <span>{DOW[parseISO(d).getDay()].slice(0, 3).toUpperCase()}</span>
@@ -383,12 +506,13 @@ function WeekStrip({ days, selected, today, dotDays, onPick }) {
 
 /* ───────────────────────── week tab ───────────────────────── */
 
-function Line({ line, done, open, onOpen, onToggle, detail }) {
+function Line({ line, done, open, onOpen, onToggle, detail, retry }) {
   return (
     <React.Fragment>
       <div className={'ln' + (done ? ' done' : '') + (open ? ' open' : '')} onClick={onOpen}>
         <div className="cb" onClick={e => { e.stopPropagation(); onToggle(); }}><IconCheck /></div>
         <div className="n">{line.name}</div>
+        {retry && <span className="retry" onClick={e => { e.stopPropagation(); retry(); }}>Retry</span>}
         <IconChev />
       </div>
       {open && (
@@ -397,16 +521,17 @@ function Line({ line, done, open, onOpen, onToggle, detail }) {
           {detail === null && <React.Fragment>{line.prescription && <br />}<span style={{ opacity: .6 }}>Loading history…</span></React.Fragment>}
           {detail && detail.current && <React.Fragment>{line.prescription && <br />}{detail.currentLabel}: {detail.current}</React.Fragment>}
           {detail && detail.previous.map((p, i) => (
-            <React.Fragment key={i}>{(line.prescription || detail.current || i > 0) && <br />}Last: {fmtShort(p.date)} — {p.text}</React.Fragment>
+            <React.Fragment key={p.id}>{(line.prescription || detail.current || i > 0) && <br />}Last: {fmtShort(p.date)} — {p.text}</React.Fragment>
           ))}
-          {detail && !detail.current && !detail.previous.length && !line.prescription && <span style={{ opacity: .6 }}>No prescription or history</span>}
+          {detail && !detail.current && !detail.previous.length && !line.prescription &&
+            <span style={{ opacity: .6 }}>No prescription or history</span>}
         </div>
       )}
     </React.Fragment>
   );
 }
 
-function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory }) {
+function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory, failedFor }) {
   const done = card.lines.filter(l => logsByEx[l.exerciseId]).length;
   return (
     <div className="card">
@@ -418,6 +543,7 @@ function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, o
                 open={openKey === l.key}
                 onOpen={() => setOpenKey(openKey === l.key ? null : l.key)}
                 onToggle={() => onToggle(l)}
+                retry={failedFor(l)}
                 detail={openKey === l.key ? detailFor(l) : undefined} />
         ))}
       </div>
@@ -429,13 +555,13 @@ function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, o
   );
 }
 
-function NotesCard({ note, onAdd, onDelete }) {
+function NotesCard({ note, onAdd, onDelete, retry }) {
   const lines = (note && note.notes ? note.notes.split('\n') : []).map(s => s.trim()).filter(Boolean);
   const [swiped, setSwiped] = useState(null);
   const start = useRef(null);
   return (
     <div className="card notes">
-      <h3>Notes</h3>
+      <h3>Notes {retry && <small className="retry" onClick={retry} style={{ cursor: 'pointer' }}>Retry</small>}</h3>
       <div className="notelines">
         {lines.length === 0 && <p style={{ color: 'var(--faint)' }}>No notes yet</p>}
         {lines.map((t, i) => (
@@ -499,12 +625,16 @@ function App() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('week');
   const [selected, setSelected] = useState(todayISO());
-  const [days, setDays] = useState({});        // iso -> { logs, note, loaded }
-  const [history, setHistory] = useState({});  // exerciseId -> [{date,text}] (2 most recent, excluding selected date)
+  const [days, setDays] = useState({});        // iso -> { logs, note, loaded, noteLoaded }
+  const [history, setHistory] = useState({});  // exerciseId|date -> two previous logs
   const [openKey, setOpenKey] = useState(null);
+  const [failed, setFailed] = useState({});    // key -> retry thunk
+  const [sheet, setSheet] = useState(null);
   const [theme, setTheme] = useState(document.documentElement.dataset.theme);
 
   const today = todayISO();
+  const daysRef = useRef(days);
+  daysRef.current = days;
 
   /* ---- load reference tables ---- */
   const loadCore = useCallback(async () => {
@@ -529,7 +659,6 @@ function App() {
     return () => { live = false; };
   }, [ready, loadCore]);
 
-  /* ---- refresh Schedule when the app comes back to the foreground ---- */
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState !== 'visible' || !data) return;
@@ -540,27 +669,30 @@ function App() {
   }, [data, loadCore]);
 
   /* ---- per-date logs + day note, cached ---- */
+  const patchDay = useCallback((date, fn) => {
+    setDays(prev => {
+      const cur = prev[date] || { logs: [], note: null, loaded: false, noteLoaded: false };
+      return { ...prev, [date]: { ...cur, ...fn(cur) } };
+    });
+  }, []);
+
   const loadDay = useCallback(async (d, withNote) => {
     const [logs, notes] = await Promise.all([
       atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']]),
       withNote ? atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']]) : Promise.resolve(null),
     ]);
-    setDays(prev => ({
-      ...prev,
-      [d]: {
-        logs: logs.map(shapeLog),
-        note: notes ? (notes[0] ? shapeNote(notes[0]) : null) : (prev[d] ? prev[d].note : null),
-        loaded: true,
-        noteLoaded: !!notes || (prev[d] ? prev[d].noteLoaded : false),
-      },
+    patchDay(d, cur => ({
+      logs: logs.map(shapeLog),
+      loaded: true,
+      note: notes ? (notes[0] ? shapeNote(notes[0]) : null) : cur.note,
+      noteLoaded: notes ? true : cur.noteLoaded,
     }));
-  }, []);
+  }, [patchDay]);
 
   useEffect(() => {
     if (!data) return;
     const d = days[selected];
     if (!d || !d.noteLoaded) loadDay(selected, true).catch(() => {});
-    // prefetch the rest of the visible week for the strip dots
     const rest = weekDays(selected).filter(x => x !== selected && !days[x]);
     rest.forEach((x, i) => setTimeout(() => loadDay(x, false).catch(() => {}), 120 * i));
   }, [data, selected]);  // eslint-disable-line
@@ -592,6 +724,93 @@ function App() {
     return up ? { name: up.name, days: daysUntil(up.date) } : null;
   }, [data, today]);
 
+  /* ---- writes ---- */
+  const clearFail = useCallback(k => setFailed(f => { if (!(k in f)) return f; const n = { ...f }; delete n[k]; return n; }), []);
+  const markFail = useCallback((k, thunk) => setFailed(f => ({ ...f, [k]: thunk })), []);
+  const onAuthLost = useCallback(() => { setReady(false); setError('Token rejected — enter it again.'); }, []);
+
+  const saveResult = useCallback(async function save(date, exerciseId, text) {
+    const key = date + '|' + exerciseId;
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const existing = snapshot.find(l => l.exerciseId === exerciseId);
+    const tmpId = 'tmp:' + Math.random().toString(36).slice(2);
+
+    patchDay(date, d => ({
+      logs: existing
+        ? d.logs.map(l => (l.exerciseId === exerciseId ? { ...l, text } : l))
+        : d.logs.concat([{ id: tmpId, exerciseId, date, text }]),
+    }));
+    clearFail(key);
+
+    try {
+      const res = await attempt(() => (existing ? updateLog(existing.id, text) : createLog(exerciseId, date, text)));
+      if (!existing && res && res.records && res.records[0]) {
+        const realId = res.records[0].id;
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmpId ? { ...l, id: realId } : l)) }));
+      }
+    } catch (e) {
+      if (e instanceof AuthError) return onAuthLost();
+      patchDay(date, () => ({ logs: snapshot }));
+      markFail(key, () => save(date, exerciseId, text));
+    }
+  }, [patchDay, clearFail, markFail, onAuthLost]);
+
+  const removeResult = useCallback(async function remove(date, exerciseId) {
+    const key = date + '|' + exerciseId;
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const existing = snapshot.find(l => l.exerciseId === exerciseId);
+    if (!existing) return;
+
+    patchDay(date, d => ({ logs: d.logs.filter(l => l.exerciseId !== exerciseId) }));
+    clearFail(key);
+
+    try {
+      await attempt(() => deleteLog(existing.id));
+    } catch (e) {
+      if (e instanceof AuthError) return onAuthLost();
+      patchDay(date, () => ({ logs: snapshot }));
+      markFail(key, () => remove(date, exerciseId));
+    }
+  }, [patchDay, clearFail, markFail, onAuthLost]);
+
+  const writeNotes = useCallback(async function write(date, next) {
+    const key = 'note|' + date;
+    const snapshot = (daysRef.current[date] || {}).note || null;
+    patchDay(date, () => ({ note: { id: snapshot ? snapshot.id : 'tmp', date, notes: next }, noteLoaded: true }));
+    clearFail(key);
+    try {
+      const res = await attempt(() => (snapshot ? updateNote(snapshot.id, next) : createNote(date, next)));
+      if (!snapshot && res && res.records && res.records[0]) {
+        const realId = res.records[0].id;
+        patchDay(date, d => ({ note: { ...d.note, id: realId } }));
+      }
+    } catch (e) {
+      if (e instanceof AuthError) return onAuthLost();
+      patchDay(date, () => ({ note: snapshot }));
+      markFail(key, () => write(date, next));
+    }
+  }, [patchDay, clearFail, markFail, onAuthLost]);
+
+  const noteLines = d => { const n = (days[d] || {}).note; return n && n.notes ? n.notes.split('\n').map(s => s.trim()).filter(Boolean) : []; };
+
+  const toggleLine = line => {
+    const existing = logsByEx[line.exerciseId];
+    if (!existing) return saveResult(selected, line.exerciseId, 'Completed');
+    if (existing.text.trim() === 'Completed') return removeResult(selected, line.exerciseId);
+    setSheet({ type: 'confirm', line, text: existing.text });
+  };
+
+  const saveBlock = (card, vals) => {
+    uniqueLines(card).forEach(l => {
+      const v = (vals[l.exerciseId] || '').trim();
+      if (!v) return;                                        // empty fields are left alone
+      const cur = logsByEx[l.exerciseId];
+      if (cur && cur.text === v) return;                     // unchanged
+      saveResult(selected, l.exerciseId, v);
+    });
+    setSheet(null);
+  };
+
   /* ---- line dropdown history ---- */
   useEffect(() => {
     if (!openKey || !data) return;
@@ -610,16 +829,13 @@ function App() {
   }, [openKey, data, selected]);  // eslint-disable-line
 
   const detailFor = useCallback(line => {
-    const k = line.exerciseId + '|' + selected;
-    const prev = history[k];
+    const prev = history[line.exerciseId + '|' + selected];
     if (prev === undefined || prev === null) return null;
     const cur = logsByEx[line.exerciseId];
-    return {
-      current: cur ? cur.text : '',
-      currentLabel: selected === today ? 'Today' : fmtShort(selected),
-      previous: prev,
-    };
+    return { current: cur ? cur.text : '', currentLabel: selected === today ? 'Today' : fmtShort(selected), previous: prev };
   }, [history, logsByEx, selected, today]);
+
+  const failedFor = useCallback(line => failed[selected + '|' + line.exerciseId], [failed, selected]);
 
   /* ---- swipe weeks ---- */
   const touch = useRef(null);
@@ -629,7 +845,7 @@ function App() {
     if (!s || tab !== 'week') return;
     const dx = e.changedTouches[0].clientX - s.x;
     const dy = e.changedTouches[0].clientY - s.y;
-    if (Math.abs(dx) > 60 && Math.abs(dy) < 45) setSelected(addDays(selected, dx < 0 ? 7 : -7));
+    if (Math.abs(dx) > 60 && Math.abs(dy) < 45) { setSelected(addDays(selected, dx < 0 ? 7 : -7)); setOpenKey(null); }
   };
 
   const toggleTheme = () => {
@@ -653,7 +869,7 @@ function App() {
 
   return (
     <div className="phone">
-      <Header race={nextRace} label={label} title={title} theme={theme} onTheme={toggleTheme}
+      <Header race={nextRace} label={label} title={title} onTheme={toggleTheme}
               onDate={d => { setTab('week'); setSelected(d); setOpenKey(null); }}
               strip={tab === 'week' ? (
                 <WeekStrip days={weekDays(selected)} selected={selected} today={today} dotDays={dotDays}
@@ -666,10 +882,19 @@ function App() {
             {cards.length === 0 && <div className="card"><h3>Rest day</h3><div className="desc">Nothing scheduled for {dowName(selected)}.</div></div>}
             {cards.map(c => (
               <BlockCard key={c.name} card={c} logsByEx={logsByEx}
-                         openKey={openKey} setOpenKey={setOpenKey} detailFor={detailFor}
-                         onToggle={() => {}} onLogResult={() => {}} onHistory={() => {}} />
+                         openKey={openKey} setOpenKey={setOpenKey} detailFor={detailFor} failedFor={failedFor}
+                         onToggle={toggleLine}
+                         onLogResult={card => setSheet({ type: 'log', card })}
+                         onHistory={card => setSheet({ type: 'history', card })} />
             ))}
-            <NotesCard note={dayState ? dayState.note : null} onAdd={() => {}} onDelete={() => {}} />
+            <NotesCard note={dayState ? dayState.note : null}
+                       retry={failed['note|' + selected]}
+                       onAdd={() => setSheet({ type: 'note' })}
+                       onDelete={i => {
+                         const lines = noteLines(selected);
+                         lines.splice(i, 1);
+                         writeNotes(selected, lines.join('\n'));
+                       }} />
           </React.Fragment>
         )}
         {tab !== 'week' && <div className="jd">{title} — coming next</div>}
@@ -682,6 +907,20 @@ function App() {
         <button className={tab === 'prs' ? 'on' : ''} onClick={() => setTab('prs')}><IconBolt />PRs</button>
         <button className={tab === 'exercises' ? 'on' : ''} onClick={() => setTab('exercises')}><IconBar />Exercises</button>
       </div>
+
+      {sheet && sheet.type === 'log' &&
+        <LogSheet card={sheet.card} date={selected} logsByEx={logsByEx}
+                  onSave={vals => saveBlock(sheet.card, vals)} onClose={() => setSheet(null)} />}
+      {sheet && sheet.type === 'history' &&
+        <HistorySheet card={sheet.card} onClose={() => setSheet(null)} />}
+      {sheet && sheet.type === 'note' &&
+        <NoteSheet date={selected}
+                   onSave={v => { const cur = noteLines(selected); writeNotes(selected, cur.concat([v.trim()]).join('\n')); setSheet(null); }}
+                   onClose={() => setSheet(null)} />}
+      {sheet && sheet.type === 'confirm' &&
+        <ConfirmSheet line={sheet.line} text={sheet.text}
+                      onConfirm={() => { removeResult(selected, sheet.line.exerciseId); setSheet(null); }}
+                      onClose={() => setSheet(null)} />}
     </div>
   );
 }
