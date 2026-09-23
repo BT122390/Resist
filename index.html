@@ -60,7 +60,7 @@
   .ln .cb svg{width:12px;height:12px;color:#fff;display:none}
   .ln.done .cb{background:var(--green);border-color:var(--green)}
   .ln.done .cb svg{display:block}
-  .ln .n{flex:1;font-size:17px;font-weight:500}
+  .ln .n{flex:1;font-size:18px;font-weight:500}
   .ln.done .n{color:var(--muted)}
   .ln .chev{width:12px;height:12px;color:var(--faint);transition:transform .15s}
   .ln.open .chev{transform:rotate(180deg)}
@@ -70,10 +70,11 @@
   .sheet .hist b{display:block;color:var(--text);font-weight:600;font-size:16px;margin-bottom:2px}
   .rx b{color:var(--text);font-weight:500}
   .btns{display:flex;gap:10px;margin-top:12px}
-  .btn{flex:1;background:var(--red-soft);color:var(--red);font-weight:600;font-size:17px;border-radius:12px;padding:13px 10px;display:flex;align-items:center;justify-content:center;gap:8px;border:0;font-family:inherit;min-height:44px}
-  .btn .ic{width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:18px;line-height:1}
+  .btns{gap:8px}
+  .btn{flex:1;background:var(--red-soft);color:var(--red);font-weight:600;font-size:15px;border-radius:12px;padding:13px 6px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;font-family:inherit;min-height:44px;white-space:nowrap}
+  .btn .ic{width:19px;height:19px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:15px;line-height:1;flex:none}
   .btn.alt{background:var(--hair);color:var(--text)}
-  .btn.alt svg{width:18px;height:18px}
+  .btn.alt svg{width:17px;height:17px;flex:none}
   .card.notes .btn{background:var(--green-soft);color:var(--green)}
   .card.notes .btn .ic{background:var(--green)}
   .notelines p{font-size:16px;padding:8px 0;border-top:1px solid var(--hair)}
@@ -107,6 +108,19 @@
   .spark i{flex:1;background:var(--faint);border-radius:3px 3px 0 0}
   .spark i:last-child{background:var(--red)}
 
+  /* races */
+  .rc{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair);min-height:44px}
+  .rc:first-of-type{border-top:0}
+  .rc .i{flex:1;min-width:0}
+  .rc .nm{font-size:18px;font-weight:500}
+  .rc .mt{color:var(--muted);font-size:15px;margin-top:1px}
+  .rc .mt.sm{font-size:14px;color:var(--faint)}
+  .rc.past .nm{color:var(--muted)}
+  .pill{flex:none;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 9px;border-radius:8px}
+  .pill.go{background:var(--red-soft);color:var(--red)}
+  .pill.maybe{background:var(--hair);color:var(--muted)}
+  .pill.done{background:var(--green-soft);color:var(--green)}
+
   /* sheet */
   .shade{position:absolute;inset:0;background:rgba(0,0,0,.35)}
   .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:22px 22px 0 0;padding:12px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:80%;overflow-y:auto}
@@ -125,8 +139,6 @@
   .tabs button{flex:1;border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
   .tabs button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8}
   .tabs button.on{color:var(--red)}
-  .tabs .plus{width:40px;height:40px;border-radius:50%;background:var(--muted);color:#fff;display:grid;place-items:center;font-size:26px;line-height:1;margin-top:-6px}
-  .tabs button.mid{gap:2px}
 
   /* setup / status */
   .setup{padding:40px 24px;color:var(--text)}
@@ -252,7 +264,15 @@ const shapeLog = r => ({
   text: r.fields['Log Text'] || '',
 });
 
-const shapeRace = r => ({ id: r.id, name: r.fields['Name'] || '', date: r.fields['Date'] || '', status: r.fields['Status'] || '' });
+const shapeRace = r => ({
+  id: r.id,
+  name: r.fields['Name'] || '',
+  date: r.fields['Date'] || '',
+  status: r.fields['Status'] || '',
+  place: r.fields['City/State'] || '',
+  miles: r.fields['Miles'] || null,
+  type: r.fields['Race Type'] || '',
+});
 
 const shapeNote = r => ({ id: r.id, date: r.fields['Date'] || '', notes: r.fields['Notes'] || '' });
 
@@ -359,6 +379,8 @@ const IconClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 const IconWeek  = () => <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>;
 const IconJour  = () => <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>;
 const IconBolt  = () => <svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>;
+const IconPlus  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
+const IconFlag  = () => <svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>;
 const IconBar   = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg>;
 
 const fmtSheetDate = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); };
@@ -430,7 +452,7 @@ function HistorySheet({ card, onClose }) {
           <b>{r.line.name}</b>
           {r.logs === null && <div>Could not load.</div>}
           {r.logs && r.logs.length === 0 && <div style={{ color: 'var(--faint)' }}>No results yet</div>}
-          {r.logs && r.logs.map(l => <div key={l.id}>{fmtShort(l.date)} — {l.text}</div>)}
+          {r.logs && r.logs.map(l => <div key={l.id}>{l.date}. {l.text}</div>)}
         </div>
       ))}
     </Sheet>
@@ -487,7 +509,7 @@ function Header({ race, label, title, strip, onTheme, onDate }) {
           <div className="tog" onClick={onTheme} role="button" aria-label="Toggle theme"><i /></div>
         </div>
       </div>
-      <div className="title"><small>{label}</small>{title}</div>
+      <div className="title">{label && <small>{label}</small>}{title}</div>
       {strip}
     </div>
   );
@@ -525,9 +547,9 @@ function Line({ line, done, open, onOpen, onToggle, detail, retry }) {
         <div className="rx">
           {line.prescription && <b>{line.prescription}</b>}
           {detail === null && <React.Fragment>{line.prescription && <br />}<span style={{ opacity: .6 }}>Loading history…</span></React.Fragment>}
-          {detail && detail.current && <React.Fragment>{line.prescription && <br />}{detail.currentLabel}: {detail.current}</React.Fragment>}
+          {detail && detail.current && <React.Fragment>{line.prescription && <br />}{detail.currentDate}. {detail.current}</React.Fragment>}
           {detail && detail.previous.map((p, i) => (
-            <React.Fragment key={p.id}>{(line.prescription || detail.current || i > 0) && <br />}Last: {fmtShort(p.date)} — {p.text}</React.Fragment>
+            <React.Fragment key={p.id}>{(line.prescription || detail.current || i > 0) && <br />}{p.date}. {p.text}</React.Fragment>
           ))}
           {detail && !detail.current && !detail.previous.length && !line.prescription &&
             <span style={{ opacity: .6 }}>No prescription or history</span>}
@@ -537,7 +559,7 @@ function Line({ line, done, open, onOpen, onToggle, detail, retry }) {
   );
 }
 
-function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory, failedFor }) {
+function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory, onAdd, failedFor }) {
   const done = card.lines.filter(l => logsByEx[l.exerciseId]).length;
   return (
     <div className="card">
@@ -556,6 +578,7 @@ function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, o
       <div className="btns">
         <button className="btn" onClick={() => onLogResult(card)}><span className="ic">+</span>Log Result</button>
         <button className="btn alt" onClick={() => onHistory(card)}><IconClock />History</button>
+        <button className="btn alt" onClick={onAdd}><IconPlus />Add</button>
       </div>
     </div>
   );
@@ -720,7 +743,7 @@ function ExercisesTab({ data }) {
               {h && h.loading && <span style={{ opacity: .6 }}>Loading…</span>}
               {h && !h.loading && h.logs.length === 0 && <span style={{ opacity: .6 }}>No results yet</span>}
               {h && !h.loading && h.logs.map((l, i) => (
-                <React.Fragment key={l.id}>{i > 0 && <br />}{fmtShort(l.date)} — {l.text}</React.Fragment>
+                <React.Fragment key={l.id}>{i > 0 && <br />}{l.date}. {l.text}</React.Fragment>
               ))}
               {h && !h.loading && h.logs.length >= h.limit && h.limit < 10 && (
                 <div style={{ color: 'var(--red)', fontWeight: 600, marginTop: 2 }}
@@ -831,24 +854,60 @@ function PRHistorySheet({ pr, onClose }) {
   return (
     <Sheet title={pr.name} sub={pr.logs.length + ' results'} onClose={onClose}>
       {pr.logs.map(l => (
-        <div className="hist" key={l.id}><b>{fmtShort(l.date)}</b>{l.text}</div>
+        <div className="hist" key={l.id}>{l.date}. {l.text}</div>
       ))}
     </Sheet>
   );
 }
 
-/* ───────────────────────── centre Log button ───────────────────────── */
+/* ───────────────────────── races ───────────────────────── */
 
-function QuickSheet({ onExercise, onNote, onClose }) {
+// Status carries the commitment: Registered is committed, Waitlist is still
+// only potential, Completed is done.
+const PILL = { 'Registered': 'go', 'Waitlist': 'maybe', 'Completed': 'done' };
+
+function RaceRow({ race, past }) {
+  const when = [race.date, !past && race.date >= todayISO() ? daysUntil(race.date) + ' days' : '']
+    .filter(Boolean).join(' · ');
+  const where = [race.place, race.miles ? race.miles + ' mi' : '', race.type].filter(Boolean).join(' · ');
   return (
-    <Sheet title="Log" onClose={onClose}>
-      <div className="btns" style={{ flexDirection: 'column', marginTop: 8 }}>
-        <button className="btn" onClick={onExercise}><span className="ic">+</span>Log an exercise</button>
-        <button className="btn alt" onClick={onNote}>Add a day note</button>
+    <div className={'rc' + (past ? ' past' : '')}>
+      <div className="i">
+        <div className="nm">{race.name}</div>
+        <div className="mt">{when}</div>
+        {where && <div className="mt sm">{where}</div>}
       </div>
-    </Sheet>
+      {race.status && <span className={'pill ' + (PILL[race.status] || 'maybe')}>{race.status}</span>}
+    </div>
   );
 }
+
+function RacesTab({ data }) {
+  const today = todayISO();
+  const upcoming = data.races.filter(r => r.date && r.date >= today && r.status !== 'Completed')
+                             .sort((a, b) => a.date.localeCompare(b.date));
+  const past = data.races.filter(r => !r.date || r.date < today || r.status === 'Completed')
+                         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return (
+    <React.Fragment>
+      {upcoming.length > 0 && (
+        <React.Fragment>
+          <div className="jd">On the calendar</div>
+          <div className="card">{upcoming.map(r => <RaceRow key={r.id} race={r} />)}</div>
+        </React.Fragment>
+      )}
+      {past.length > 0 && (
+        <React.Fragment>
+          <div className="jd" style={{ marginTop: 6 }}>Done</div>
+          <div className="card">{past.map(r => <RaceRow key={r.id} race={r} past />)}</div>
+        </React.Fragment>
+      )}
+      {data.races.length === 0 && <div className="jd">No races yet.</div>}
+    </React.Fragment>
+  );
+}
+
+/* ───────────────────────── quick log ───────────────────────── */
 
 function QuickLogSheet({ data, date, onSave, onClose }) {
   const [q, setQ] = useState('');
@@ -1173,8 +1232,8 @@ function App() {
     const prev = history[line.exerciseId + '|' + selected];
     if (prev === undefined || prev === null) return null;
     const cur = logsByEx[line.exerciseId];
-    return { current: cur ? cur.text : '', currentLabel: selected === today ? 'Today' : fmtShort(selected), previous: prev };
-  }, [history, logsByEx, selected, today]);
+    return { current: cur ? cur.text : '', currentDate: selected, previous: prev };
+  }, [history, logsByEx, selected]);
 
   const failedFor = useCallback(line => failed[selected + '|' + line.exerciseId], [failed, selected]);
 
@@ -1218,8 +1277,9 @@ function App() {
   if (!data) return <div className="phone"><div className="boot">Loading…</div></div>;
 
   const TITLES = {
-    week: [dowName(selected), fmtLong(selected)],
+    week: ['', fmtLong(selected) + ' - ' + dowName(selected)],
     journal: ['Training log', 'Journal'],
+    races: ['Calendar', 'Races'],
     prs: ['Benchmarks', 'Personal Records'],
     exercises: ['Library', 'Exercises'],
   };
@@ -1243,7 +1303,8 @@ function App() {
                          openKey={openKey} setOpenKey={setOpenKey} detailFor={detailFor} failedFor={failedFor}
                          onToggle={toggleLine}
                          onLogResult={card => setSheet({ type: 'log', card })}
-                         onHistory={card => setSheet({ type: 'history', card })} />
+                         onHistory={card => setSheet({ type: 'history', card })}
+                         onAdd={() => setSheet({ type: 'quicklog' })} />
             ))}
             <NotesCard note={dayState ? dayState.note : null}
                        retry={failed['note|' + selected]}
@@ -1258,6 +1319,7 @@ function App() {
         {tab === 'journal' &&
           <JournalTab data={data} days={days} logs={journal.logs} more={journal.more} loading={journal.loading}
                       onLoadMore={() => loadJournal(false)} onOpenLine={openFromJournal} ensureNote={ensureNote} />}
+        {tab === 'races' && <RacesTab data={data} />}
         {tab === 'exercises' && <ExercisesTab data={data} />}
         {tab === 'prs' && <PRsTab data={data} onOpen={pr => setSheet({ type: 'pr', pr })} />}
       </div>
@@ -1265,7 +1327,7 @@ function App() {
       <div className="tabs">
         <button className={tab === 'week' ? 'on' : ''} onClick={() => setTab('week')}><IconWeek />Week</button>
         <button className={tab === 'journal' ? 'on' : ''} onClick={() => setTab('journal')}><IconJour />Journal</button>
-        <button className="mid" onClick={() => setSheet({ type: 'quick' })}><div className="plus">+</div>Log</button>
+        <button className={tab === 'races' ? 'on' : ''} onClick={() => setTab('races')}><IconFlag />Races</button>
         <button className={tab === 'prs' ? 'on' : ''} onClick={() => setTab('prs')}><IconBolt />PRs</button>
         <button className={tab === 'exercises' ? 'on' : ''} onClick={() => setTab('exercises')}><IconBar />Exercises</button>
       </div>
@@ -1281,10 +1343,6 @@ function App() {
                    onClose={() => setSheet(null)} />}
       {sheet && sheet.type === 'pr' &&
         <PRHistorySheet pr={sheet.pr} onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'quick' &&
-        <QuickSheet onClose={() => setSheet(null)}
-                    onExercise={() => setSheet({ type: 'quicklog' })}
-                    onNote={() => { setTab('week'); setSheet({ type: 'note' }); }} />}
       {sheet && sheet.type === 'quicklog' &&
         <QuickLogSheet data={data} date={selected}
                        onSave={(when, exId, text) => { saveResult(when, exId, text); setSheet(null); }}

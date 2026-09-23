@@ -1,5 +1,23 @@
 # Updates
 
+## v1.1 — 2026-09-22
+
+- The centre Log button is gone from the tab bar; **Races** takes its place.
+  Races lists everything on the calendar by date, then what is done, with a
+  coloured status pill — Registered reads as committed, Waitlist as still
+  potential, Completed in green. Airtable has no potential/committed field, so
+  the pill is driven by `Status`.
+- Every block card now carries **Add** alongside Log Result and History, which
+  logs any exercise against the selected day — the picker the centre button
+  used to open. The three buttons are set a size smaller so they fit a phone
+  without crowding.
+- Exercise lines are 18px, up from 17.
+- History reads `2026-09-22. 3×5 @ 185` instead of `Last: Sep 22 — 3×5 @ 185`,
+  in the line dropdown, the Exercises tab, the block History sheet and the PR
+  history. Since every line now carries a full date, the day's own result no
+  longer needs a "Today" label.
+- The header puts the date and weekday on one line: `September 22 - Tuesday`.
+
 ## v1.0 — 2026-09-21
 
 First release. Single-file PWA against the Training base.
