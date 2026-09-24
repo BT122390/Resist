@@ -225,6 +225,12 @@
   .pg{z-index:10}
   .pg .shade,.pg .sheet{z-index:30}
   .opt .ob b{font-size:16px}
+  .pill{flex:none;display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:7px;margin-left:8px}
+  .pill.go{background:var(--red-soft);color:var(--red)}
+  .pill.maybe{background:var(--bar);color:var(--muted)}
+  .pill.done{background:var(--green-soft);color:var(--green)}
+  .weeks .wk{cursor:pointer}
+  .jday{cursor:pointer}
   .chipmini{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 6px;margin-left:6px;background:var(--bar);color:var(--muted)}
   .chipmini[data-amber="amber"]{background:#FEF7E0;color:#B06000}
   .chipmini[data-amber="red"]{background:var(--red-soft);color:var(--red)}
@@ -586,6 +592,14 @@ const updateLog = (id, text) =>
   at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields: { 'Log Text': text } }] } });
 const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
 
+const createNote = (date, notes) =>
+  at(TBL.dayNotes, { method: 'POST', body: { records: [{ fields: { 'Date': date, 'Notes': notes } }] } });
+const updateNote = (id, notes) =>
+  at(TBL.dayNotes, { method: 'PATCH', body: { records: [{ id, fields: { 'Notes': notes } }] } });
+
+const createExercise = name =>
+  at(TBL.exercises, { method: 'POST', body: { records: [{ fields: { 'Name': name } }] } });
+
 const setRowExercises = (id, exercises) =>
   at(TBL.schedule, { method: 'PATCH', body: { records: [{ id, fields: { 'Exercise': exercises } }] } });
 
@@ -751,7 +765,7 @@ function ExerciseRow({ line, log, last, onToggle, onOpen, onRemove, onDragStart,
 
 /* ═══════════════════════ bottom bar ═══════════════════════ */
 
-function BottomBar({ raceDays, onTheme, inert }) {
+function BottomBar({ raceDays, onTheme, onGo }) {
   const btn = (icon, label, onClick, cls) => (
     <div className="bb" onClick={onClick}>
       <div className={'c' + (cls || '')}>{icon}{label === 'Races' && raceDays != null && <div className="badge">{raceDays}</div>}</div>
@@ -760,11 +774,11 @@ function BottomBar({ raceDays, onTheme, inert }) {
   );
   return (
     <div className="bot">
-      {btn(<IcBar />, 'Exercises', inert)}
-      {btn(<IcFlag />, 'Races', inert)}
-      {btn(<IcGlass />, 'Search', inert)}
+      {btn(<IcBar />, 'Exercises', () => onGo('exercises'))}
+      {btn(<IcFlag />, 'Races', () => onGo('races'))}
+      {btn(<IcGlass />, 'Search', () => onGo('search'))}
       {btn(<IcMoon />, 'Theme', onTheme)}
-      {btn(<IcPlus />, 'Add', inert, ' add')}
+      {btn(<IcPlus />, 'Add', () => onGo('add'), ' add')}
     </div>
   );
 }
@@ -989,6 +1003,555 @@ function ExercisePage({ line, index, total, date, exercise, log, prev, next, sch
   );
 }
 
+/* ═══════════════════════ notes page ═══════════════════════ */
+
+const IcSearch = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M16 16l5 5" /></svg>;
+
+// Swipe a note aside to delete it. Same axis lock as the day rows: a
+// pointercancel is the browser taking over for scrolling and must not commit.
+function NoteLine({ label, text, onDelete }) {
+  const el = useRef(null);
+  const g = useRef(null);
+  const setX = x => { if (el.current) el.current.style.transform = x ? 'translateX(' + x + 'px)' : ''; };
+
+  const down = e => { if (!onDelete) return; g.current = { x0: e.clientX, y0: e.clientY, lastX: e.clientX, axis: null }; if (el.current) el.current.style.transition = 'none'; };
+  const move = e => {
+    const s = g.current; if (!s) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (s.axis === null) {
+      if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) { s.axis = 'y'; setX(0); return; }
+      if (dx < -12 && Math.abs(dx) > Math.abs(dy) * 1.5) s.axis = 'x'; else return;
+    }
+    if (s.axis !== 'x') return;
+    s.lastX = e.clientX;
+    setX(Math.max(Math.min(0, dx), -120));
+  };
+  const finish = commit => () => {
+    const s = g.current; g.current = null;
+    if (el.current) el.current.style.transition = '';
+    if (!s || s.axis !== 'x' || !commit) return setX(0);
+    if (s.lastX - s.x0 < -120) { setX(-window.innerWidth); setTimeout(onDelete, 160); }
+    else setX(0);
+  };
+
+  return (
+    <div ref={el} className="nl" onPointerDown={down} onPointerMove={move}
+         onPointerUp={finish(true)} onPointerCancel={finish(false)}>
+      <span>{label}</span>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function NotesPage({ date, readiness, lines, times, weekNotes, onClose, onReadiness, onAdd, onDelete, onJump, onCopy }) {
+  const [draft, setDraft] = useState('');
+  const [menu, setMenu] = useState(false);
+  const add = () => { if (!draft.trim()) return; onAdd(draft.trim()); setDraft(''); };
+  const meaning = readiness ? READINESS[readiness].line : 'Tap to set';
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onClose}><IcBack /></div>
+        <div className="pos">{fmtDayShort(date)}</div>
+        <div className="pgacts"><div className="ic" onClick={() => setMenu(true)}><IcDots /></div></div>
+      </div>
+
+      <div className="pgscroll">
+        <div className="pgname" style={{ padding: '6px 0 14px' }}>Notes</div>
+
+        <div className="ready">
+          <span className="rl">Readiness</span>
+          {Object.keys(READINESS).map(k => (
+            <div key={k} className={'rc ' + READINESS[k].key + (readiness === k ? ' on' : '')}
+                 onClick={() => onReadiness(readiness === k ? null : k)} />
+          ))}
+          <span className="rt">{meaning}</span>
+        </div>
+
+        <div className="pgfield" style={{ marginTop: 8 }}>
+          <input value={draft} placeholder="Add a note…" onChange={e => setDraft(e.target.value)}
+                 onKeyDown={e => e.key === 'Enter' && add()} />
+          <div className="save" onClick={add}><IcTick /></div>
+        </div>
+
+        <div className="sec">
+          {lines.length === 0 && <p className="rule">No notes for this day yet.</p>}
+          {lines.map((t, i) => (
+            <NoteLine key={i + ':' + t} label={times[t] || ''} text={t} onDelete={() => onDelete(i)} />
+          ))}
+        </div>
+
+        {weekNotes.length > 0 && (
+          <div className="sec">
+            <div className="lab">Earlier this week</div>
+            {weekNotes.map(w => w.lines.map((t, i) => (
+              <div key={w.date + i} onClick={() => onJump(w.date)}>
+                <NoteLine label={DOW[parseISO(w.date).getDay()].slice(0, 3)} text={t} />
+              </div>
+            )))}
+          </div>
+        )}
+      </div>
+
+      {menu && (
+        <Sheet onClose={() => setMenu(false)}>
+          <div className="shead">{fmtFull(date)}</div>
+          <div className="opt" onClick={() => { setMenu(false); onCopy(); }}>
+            <div className="ob"><b>Copy all notes</b><small>{lines.length} line{lines.length === 1 ? '' : 's'} to the clipboard</small></div>
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════ races ═══════════════════════ */
+
+const RACE_PILL = { 'Registered': 'go', 'Waitlist': 'maybe', 'Completed': 'done' };
+
+function RacesPage({ races, onClose }) {
+  const today = todayISO();
+  const upcoming = races.filter(r => r.date && r.date >= today && r.status !== 'Completed').sort((a, b) => a.date.localeCompare(b.date));
+  const past = races.filter(r => !r.date || r.date < today || r.status === 'Completed').sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const row = (r, isPast) => (
+    <div className="row" key={r.id}>
+      <div className="av" style={{ background: isPast ? '#5F6368' : '#C5221F' }}><i>⚑</i></div>
+      <div className="body">
+        <div className="t">
+          <div className="name" style={isPast ? { color: 'var(--muted)', fontWeight: 500 } : null}>{r.name}</div>
+          <div className="when">{!isPast && r.date ? daysUntil(r.date) + 'd' : ''}</div>
+        </div>
+        <div className="p1">{[fmtShort(r.date), r.place].filter(Boolean).join(' · ')}</div>
+        <div className="p2">
+          {r.miles ? r.miles + ' mi' : ''}
+          {r.status && <span className={'pill ' + (RACE_PILL[r.status] || 'maybe')}>{r.status}</span>}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onClose}><IcBack /></div>
+        <div className="pos">Races</div>
+        <div className="pgacts"><div className="ic" /></div>
+      </div>
+      <div className="pgscroll" style={{ padding: 0 }}>
+        {upcoming.length > 0 && <div className="lbl">On the calendar</div>}
+        {upcoming.map(r => row(r, false))}
+        {past.length > 0 && <div className="lbl">Done</div>}
+        {past.map(r => row(r, true))}
+        {races.length === 0 && <div className="lbl">No races yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ search ═══════════════════════ */
+
+// A day's headline is its first logged exercise in schedule order.
+function daySummary(dateISO, logs, schedule, exById) {
+  const order = {};
+  rowsForDate(schedule, dateISO).rows.forEach(r => r.exercises.forEach(id => { if (order[id] == null) order[id] = r.order; }));
+  const sorted = [...logs].sort((a, b) => (order[a.exerciseId] ?? 1e9) - (order[b.exerciseId] ?? 1e9));
+  const head = sorted[0];
+  const name = head ? (exById[head.exerciseId] || {}).name || '?' : '';
+  const results = sorted.slice(0, 3)
+    .filter(l => !isCompleted(l.text) && !isSkipped(l.text))
+    .map(l => splitResult(l.text).body).filter(Boolean);
+  const rest = sorted.slice(3);
+  return {
+    name,
+    when: logs.length === 1 && !isCompleted(head.text) ? splitResult(head.text).body.slice(0, 14) : logs.length + ' log' + (logs.length === 1 ? '' : 's'),
+    line: results.join(' · '),
+    rest: rest.map(l => ({ name: (exById[l.exerciseId] || {}).name || '?', skipped: isSkipped(l.text) })),
+    av: head ? (order[head.exerciseId] != null ? null : null) : null,
+  };
+}
+
+function SearchPage({ corpus, notes, schedule, exById, onClose, onOpenLog, onOpenDay }) {
+  const [q, setQ] = useState('');
+  const [painOnly, setPainOnly] = useState(false);
+  const [week, setWeek] = useState(weekStartOf(todayISO()));
+
+  const weeks = useMemo(() => {
+    const oldest = corpus.logs.length ? corpus.logs[corpus.logs.length - 1].date : todayISO();
+    const out = [];
+    let w = weekStartOf(todayISO());
+    const stop = weekStartOf(oldest);
+    while (w >= stop && out.length < 80) { out.push(w); w = addDays(w, -7); }
+    return out;
+  }, [corpus.logs]);
+
+  const needle = q.trim().toLowerCase();
+  const showResults = needle.length > 0 || painOnly;
+
+  const hits = useMemo(() => {
+    if (!showResults) return [];
+    return corpus.logs.filter(l => {
+      if (painOnly) { const p = splitResult(l.text).pain; if (p == null || p < 2) return false; }
+      if (!needle) return true;
+      const n = (exById[l.exerciseId] || {}).name || '';
+      return n.toLowerCase().includes(needle);   // never matches on the result text
+    });
+  }, [corpus.logs, needle, painOnly, exById, showResults]);
+
+  const noteHits = useMemo(() => {
+    if (!needle) return [];
+    return notes.filter(n => (n.notes || '').toLowerCase().includes(needle));
+  }, [notes, needle]);
+
+  const days = useMemo(() => {
+    const byDate = {};
+    corpus.logs.forEach(l => { (byDate[l.date] = byDate[l.date] || []).push(l); });
+    return weekDays(week).map(d => ({ date: d, logs: byDate[d] || [], note: notes.find(n => n.date === d) || null }));
+  }, [corpus.logs, week, notes]);
+
+  const weekLogCount = days.reduce((n, d) => n + d.logs.length, 0);
+  const weekDayCount = days.filter(d => d.logs.length).length;
+
+  return (
+    <div className="pg on">
+      <div className="top">
+        <div className="daybar sbar">
+          <div className="back" onClick={onClose}><IcBack /></div>
+          <input className="sin" value={q} placeholder="Search exercises and notes" autoFocus
+                 onChange={e => setQ(e.target.value)} />
+          {(q || painOnly) && <div className="clr" onClick={() => { setQ(''); setPainOnly(false); }}>×</div>}
+        </div>
+      </div>
+
+      <div className="weeks">
+        <span className={'wk' + (painOnly ? ' on' : '')} onClick={() => setPainOnly(!painOnly)}>Pain ≥ 2</span>
+        {weeks.map(w => (
+          <span key={w} className={'wk' + (!showResults && w === week ? ' on' : '')}
+                onClick={() => { setQ(''); setPainOnly(false); setWeek(w); }}>
+            {w === weekStartOf(todayISO()) ? 'This week' : weekLabel(w)}
+          </span>
+        ))}
+      </div>
+
+      <div className="pgscroll" style={{ padding: 0 }}>
+        {corpus.loading && <div className="lbl">Loading logs…</div>}
+
+        {showResults && (
+          <React.Fragment>
+            <div className="lbl">
+              {painOnly && !needle ? 'Pain 2 or higher' : q.trim()} · {hits.length} result{hits.length === 1 ? '' : 's'}
+            </div>
+            {hits.map(l => {
+              const r = splitResult(l.text);
+              const ex = exById[l.exerciseId] || {};
+              const rowsThatDay = rowsForDate(schedule, l.date).rows.find(x => x.exercises.includes(l.exerciseId));
+              const av = rowsThatDay ? avatarFor(rowsThatDay) : { letter: (ex.name || '?')[0], color: '#5F6368' };
+              return (
+                <div className="row" key={l.id} onClick={() => onOpenLog(l)}>
+                  <div className="av" style={{ background: av.color }}><i>{av.letter}</i></div>
+                  <div className="body">
+                    <div className="t"><div className="name">{ex.name}</div><div className="when">{fmtShort(l.date)}</div></div>
+                    <div className="p1">{r.body}</div>
+                    <div className="p2">
+                      {[dowName(l.date), rowsThatDay ? (rowsThatDay.block || rowsThatDay.section) : ''].filter(Boolean).join(' · ')}
+                      {r.pain != null && <span className="chipmini" data-amber={r.pain >= 3 ? 'red' : r.pain >= 2 ? 'amber' : ''}>pain {r.pain}</span>}
+                      {r.rpe != null && <span className="chipmini">RPE {r.rpe}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {hits.length === 0 && <div style={{ padding: '10px 16px', color: 'var(--faint)' }}>No matching exercises.</div>}
+
+            {noteHits.length > 0 && (
+              <React.Fragment>
+                <div className="lbl" style={{ paddingTop: 22 }}>Also matches</div>
+                {noteHits.map(n => (
+                  <div className="row" key={n.id} onClick={() => onOpenDay(n.date)}>
+                    <div className="av" style={{ background: '#5F6368' }}><i>✎</i></div>
+                    <div className="body">
+                      <div className="t"><div className="name">{dowName(n.date)} notes</div><div className="when">{fmtShort(n.date)}</div></div>
+                      <div className="p1">{splitNotes(n.notes).lines.find(t => t.toLowerCase().includes(needle)) || ''}</div>
+                      <div className="p2">Day note</div>
+                    </div>
+                  </div>
+                ))}
+              </React.Fragment>
+            )}
+          </React.Fragment>
+        )}
+
+        {!showResults && (
+          <React.Fragment>
+            <div className="lbl">{weekLabel(week)} · {weekLogCount} logs · {weekDayCount} of 7 days</div>
+            {days.slice().reverse().map(d => {
+              if (!d.logs.length) {
+                return <div className="jday" key={d.date} style={{ color: 'var(--faint)' }}
+                            onClick={() => onOpenDay(d.date)}>{fmtDayShort(d.date)} — no logs</div>;
+              }
+              const s = daySummary(d.date, d.logs, schedule, exById);
+              const r = d.note ? splitNotes(d.note.notes).readiness : null;
+              return (
+                <React.Fragment key={d.date}>
+                  <div className="jday">
+                    {r && <span className={'rdot ' + READINESS[r].key} />}{fmtDayShort(d.date)}
+                  </div>
+                  <div className="row" onClick={() => onOpenDay(d.date)}>
+                    <div className="av" style={{ background: '#0B8043' }}><i>{(s.name || '?')[0]}</i></div>
+                    <div className="body">
+                      <div className="t"><div className="name">{s.name}</div><div className="when">{s.when}</div></div>
+                      <div className="p1">{s.line}</div>
+                      <div className="p2">
+                        {s.rest.length > 0 && '+ '}
+                        {s.rest.map((x, i) => (
+                          <React.Fragment key={i}>
+                            {i > 0 && ', '}
+                            {x.skipped ? <s>{x.name}</s> : x.name}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {d.note && splitNotes(d.note.notes).lines.length > 0 && (
+                    <div className="row note" onClick={() => onOpenDay(d.date)}>
+                      <div className="av"><i>✎</i></div>
+                      <div className="body">
+                        <div className="p1">{splitNotes(d.note.notes).lines[0]}</div>
+                        <div className="p2">{splitNotes(d.note.notes).lines[1] || ''}</div>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ exercises library ═══════════════════════ */
+
+function ExercisesPage({ exercises, schedule, exById, onClose, onOpen }) {
+  const [q, setQ] = useState('');
+  const scheduled = useMemo(() => {
+    const s = new Set();
+    schedule.forEach(r => r.exercises.forEach(id => s.add(id)));
+    return s;
+  }, [schedule]);
+  const homeRow = useMemo(() => {
+    const m = {};
+    schedule.filter(r => !r.weekOf).forEach(r => r.exercises.forEach(id => {
+      if (!m[id] || (!m[id].prescription && r.prescription)) m[id] = r;
+    }));
+    return m;
+  }, [schedule]);
+
+  const needle = q.trim().toLowerCase();
+  const match = e => !needle || e.name.toLowerCase().includes(needle);
+  const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
+  const live = sorted.filter(e => scheduled.has(e.id) && match(e));
+  const archived = sorted.filter(e => !scheduled.has(e.id) && match(e));
+
+  const row = (e, grey) => {
+    const r = homeRow[e.id];
+    const av = r ? avatarFor(r) : { letter: (e.name || '?')[0].toUpperCase(), color: '#5F6368' };
+    return (
+      <div className="row" key={e.id} onClick={() => onOpen(e)}>
+        <div className="av" style={{ background: grey ? '#5F6368' : av.color }}><i>{av.letter}</i></div>
+        <div className="body">
+          <div className="t"><div className="name" style={grey ? { color: 'var(--muted)', fontWeight: 500 } : null}>{e.name}</div></div>
+          <div className="p1">{r ? r.prescription || '—' : 'Not scheduled'}</div>
+          <div className="p2">{r ? r.dow : 'Archived'}</div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="pg on">
+      <div className="top">
+        <div className="daybar sbar">
+          <div className="back" onClick={onClose}><IcBack /></div>
+          <input className="sin" value={q} placeholder="Search exercises" onChange={e => setQ(e.target.value)} />
+          {q && <div className="clr" onClick={() => setQ('')}>×</div>}
+        </div>
+      </div>
+      <div className="pgscroll" style={{ padding: 0 }}>
+        {live.map(e => row(e, false))}
+        {archived.length > 0 && <div className="lbl" style={{ borderTop: '1px solid var(--hair)', marginTop: 8 }}>Not scheduled</div>}
+        {archived.map(e => row(e, true))}
+        {live.length === 0 && archived.length === 0 && <div className="lbl">Nothing matches “{q}”.</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ exercise page, library mode ═══════════════════════ */
+
+// No date and no result field: what this exercise is, where it sits in the
+// plan, and everything ever logged against it.
+function LibraryPage({ exercise, schedule, onClose }) {
+  const [hist, setHist] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    setHist(null);
+    limit(() => atAll(TBL.logs, [
+      ['filterByFormula', '{Exercise} = "' + esc(exercise.name) + '"'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+    ])).then(rs => { if (live) setHist(rs.map(shapeLog)); })
+       .catch(() => { if (live) setHist([]); });
+    return () => { live = false; };
+  }, [exercise.name]);
+
+  const rows = schedule.filter(r => !r.weekOf && r.exercises.includes(exercise.id))
+                       .sort((a, b) => DOW.indexOf(a.dow) - DOW.indexOf(b.dow));
+  const av = rows.length ? avatarFor(rows[0]) : { letter: (exercise.name || '?')[0].toUpperCase(), color: '#5F6368' };
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onClose}><IcBack /></div>
+        <div className="pos">Library</div>
+        <div className="pgacts"><div className="ic" /></div>
+      </div>
+      <div className="pgscroll">
+        <div className="pghead">
+          <div className="av" style={{ background: av.color, margin: 0 }}><i>{av.letter}</i></div>
+          <div>
+            <div className="pgname">{exercise.name}</div>
+            <div className="pgsub">{rows.length ? rows.map(r => r.dow).join(' · ') : 'Not scheduled'}</div>
+          </div>
+        </div>
+
+        {rows.length > 0 && (
+          <div className="sec">
+            <div className="lab">Prescription</div>
+            {rows.map(r => (
+              <p key={r.id}>
+                <b style={{ fontWeight: 600 }}>{r.dow}</b>
+                {r.block ? ' · ' + r.block : ''} — {r.prescription || 'no prescription'}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {exercise.notes && (
+          <div className="sec">
+            <div className="lab">Coaching notes</div>
+            {exercise.notes.split('\n').map(s => s.trim()).filter(Boolean).map((t, i) => <p key={i}>{t}</p>)}
+          </div>
+        )}
+
+        <div className="sec">
+          <div className="lab">History</div>
+          {hist === null && <p className="rule">Loading…</p>}
+          {hist && hist.length === 0 && <p className="rule">No results yet.</p>}
+          {(hist || []).map(l => {
+            const r = splitResult(l.text);
+            return (
+              <div className="h" key={l.id}>
+                <span>{fmtShort(l.date)}</span>
+                <span>
+                  {r.body}
+                  {r.pain != null && <span className="chipmini" data-amber={r.pain >= 3 ? 'red' : r.pain >= 2 ? 'amber' : ''}>pain {r.pain}</span>}
+                  {r.rpe != null && <span className="chipmini">RPE {r.rpe}</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ add sheet ═══════════════════════ */
+
+function AddSheet({ date, exercises, schedule, onClose, onAdd, onCreate, onPlanNext, onResetWeek, isOverlay }) {
+  const [q, setQ] = useState('');
+  const [scope, setScope] = useState('week');   // 'week' | 'every'
+  const [busy, setBusy] = useState(false);
+
+  // The template row an exercise normally lives on, for its home day and
+  // prescription.
+  const homeRow = useMemo(() => {
+    const m = {};
+    schedule.filter(r => !r.weekOf).forEach(r => r.exercises.forEach(id => {
+      if (!m[id] || (!m[id].prescription && r.prescription)) m[id] = r;
+    }));
+    return m;
+  }, [schedule]);
+
+  const needle = q.trim().toLowerCase();
+  const matches = needle
+    ? exercises.filter(e => e.name.toLowerCase().includes(needle))
+               .sort((a, b) => a.name.localeCompare(b.name)).slice(0, 6)
+    : [];
+  const exact = matches.some(e => e.name.toLowerCase() === needle);
+
+  const go = async fn => { if (busy) return; setBusy(true); await fn(); setBusy(false); };
+
+  return (
+    <Sheet onClose={onClose}>
+      <div className="shead">Add to {fmtDayShort(date)}</div>
+
+      <div className="daybar sbar" style={{ marginBottom: 8 }}>
+        <span style={{ width: 20, height: 20, marginLeft: 10, color: 'var(--muted)', flex: 'none', display: 'grid', placeItems: 'center' }}><IcSearch /></span>
+        <input className="sin" value={q} placeholder="Search exercises" autoFocus onChange={e => setQ(e.target.value)} />
+      </div>
+
+      {matches.map(e => {
+        const r = homeRow[e.id];
+        const av = r ? dayAvatar(r.dow) : { letter: '?', color: '#5F6368' };
+        return (
+          <div className="opt" key={e.id} onClick={() => go(() => onAdd(e, scope))}>
+            <div className="av" style={{ background: av.color }}><i>{av.letter}</i></div>
+            <div className="ob">
+              <b>{e.name}</b>
+              <small>{r ? [r.dow, r.prescription].filter(Boolean).join(' · ') : 'Not scheduled'}</small>
+            </div>
+            <div className="plus">+</div>
+          </div>
+        );
+      })}
+
+      {needle && !exact && (
+        <div className="opt new" onClick={() => go(() => onCreate(q.trim(), scope))}>
+          <div className="av"><i>+</i></div>
+          <div className="ob"><b>Create “{q.trim()}”</b><small>New exercise — added to the library</small></div>
+        </div>
+      )}
+
+      <div className="scope">
+        <span className={scope === 'week' ? 'on' : ''} onClick={() => setScope('week')}>This week only</span>
+        <span className={scope === 'every' ? 'on' : ''} onClick={() => setScope('every')}>Every {dowName(date)}</span>
+      </div>
+
+      <div className="opt" style={{ marginTop: 8 }} onClick={() => go(onPlanNext)}>
+        <div className="av" style={{ background: 'var(--blue-soft)', color: 'var(--blue)' }}><i>→</i></div>
+        <div className="ob">
+          <b>Plan next week</b>
+          <small>Copy this week to {weekLabel(nextMonday(date))} and open it for editing</small>
+        </div>
+      </div>
+
+      {isOverlay && (
+        <div className="opt" onClick={() => go(onResetWeek)}>
+          <div className="av" style={{ background: 'var(--red-soft)', color: 'var(--red)' }}><i>↺</i></div>
+          <div className="ob">
+            <b style={{ color: 'var(--red)' }}>Reset week to template</b>
+            <small>Discards this week's changes</small>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
 /* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
@@ -1031,6 +1594,10 @@ function App() {
   const [orderOf, setOrder] = useState({});      // date -> [line key] while a reorder is in flight
   const [swipeOpen, setSwipeOpen] = useState(null);
   const [openKey, setOpenKey] = useState(null);   // exercise page
+  const [view, setView] = useState(null);         // 'notes' | 'search' | 'exercises' | 'races' | 'add'
+  const [libEx, setLibEx] = useState(null);       // exercise opened from the library
+  const [noteTimes, setNoteTimes] = useState({}); // note text -> time, this session only
+  const [corpus, setCorpus] = useState({ logs: [], notes: [], loading: false, loaded: false });
   const [theme, setTheme]   = useState(document.documentElement.dataset.theme);
 
   const today = todayISO();
@@ -1194,6 +1761,138 @@ function App() {
         const id = res.records[0].id;
         patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
       } catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that.', { kind: 'error' }); }
+    }
+  };
+
+  /* ---- search corpus: logs back 12 months or 2000 rows, plus every day note ---- */
+  const loadCorpus = useCallback(async () => {
+    setCorpus(c => ({ ...c, loading: true }));
+    const cutoff = (() => { const d = parseISO(todayISO()); d.setMonth(d.getMonth() - SEARCH_MONTHS); return iso(d); })();
+    const logs = [];
+    let offset;
+    try {
+      do {
+        const page = await atPage(TBL.logs, [
+          ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['pageSize', 100],
+        ], offset);
+        logs.push(...page.records.map(shapeLog));
+        offset = page.offset;
+      } while (offset && logs.length < SEARCH_MAX && (!logs.length || logs[logs.length - 1].date >= cutoff));
+      const notes = await atAll(TBL.dayNotes);
+      setCorpus({ logs, notes: notes.map(shapeNote), loading: false, loaded: true });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setCorpus(c => ({ ...c, loading: false }));
+    }
+  }, []);
+
+  useEffect(() => { if (view === 'search' && !corpus.loaded && !corpus.loading) loadCorpus(); }, [view, corpus.loaded, corpus.loading, loadCorpus]);
+
+  /* ---- day notes ---- */
+  const writeNotes = useCallback(async (date, readiness, lines) => {
+    const next = buildNotes(readiness, lines);
+    const snapshot = (daysRef.current[date] || {}).note || null;
+    patchDay(date, () => ({ note: { id: snapshot ? snapshot.id : 'tmp', date, notes: next }, noteLoaded: true }));
+    try {
+      const res = snapshot && snapshot.id !== 'tmp'
+        ? await updateNote(snapshot.id, next)
+        : await createNote(date, next);
+      const id = res.records[0].id;
+      patchDay(date, d => ({ note: { ...d.note, id } }));
+      setCorpus(c => c.loaded
+        ? { ...c, notes: c.notes.some(n => n.date === date)
+            ? c.notes.map(n => (n.date === date ? { ...n, id, notes: next } : n))
+            : c.notes.concat([{ id, date, notes: next }]) }
+        : c);
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      patchDay(date, () => ({ note: snapshot }));
+      showToast('Could not save that note.', { kind: 'error' });
+    }
+  }, [patchDay, showToast]);
+
+  /* ---- add an exercise to a day ---- */
+  const addExercise = async (exercise, scope) => {
+    const date = selected;
+    const dow = dowName(date);
+    try {
+      const home = schedRef.current.find(r => !r.weekOf && r.exercises.includes(exercise.id));
+      const prescription = home ? home.prescription : '';
+
+      if (scope === 'every') {
+        // Straight onto the template; no week is materialized.
+        const rows = schedRef.current.filter(r => !r.weekOf && r.dow === dow);
+        const order = (rows.length ? Math.max(...rows.map(r => r.order)) : 0) + 10;
+        const fields = { 'Day of Week': dow, 'Order': order, 'Section': 'Main Session', 'Exercise': [exercise.id] };
+        if (prescription) fields['Prescription'] = prescription;
+        const made = await createMany(TBL.schedule, [fields]);
+        setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+        showToast('Added ' + exercise.name + ' to every ' + dow + '.');
+      } else {
+        await ensureOverlay(date);
+        const ws = weekStartOf(date);
+        const rows = schedRef.current.filter(r => r.weekOf === ws && r.dow === dow);
+        const order = (rows.length ? Math.max(...rows.map(r => r.order)) : 0) + 10;
+        const fields = { 'Day of Week': dow, 'Week Of': ws, 'Order': order, 'Section': 'Main Session', 'Exercise': [exercise.id] };
+        if (prescription) fields['Prescription'] = prescription;
+        const made = await createMany(TBL.schedule, [fields]);
+        setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+        showToast('Added ' + exercise.name + '.');
+      }
+      setView(null);
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not add ' + exercise.name + '.', { kind: 'error' });
+    }
+  };
+
+  const createAndAdd = async (name, scope) => {
+    try {
+      const res = await createExercise(name);
+      const ex = shapeExercise(res.records[0]);
+      setData(d => ({ ...d, exercises: d.exercises.concat([ex]), exById: { ...d.exById, [ex.id]: ex } }));
+      await addExercise(ex, scope);
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not create “' + name + '”.', { kind: 'error' });
+    }
+  };
+
+  /* ---- plan next week / reset week ---- */
+  const planNextWeek = async () => {
+    const target = nextMonday(selected);
+    try {
+      const { alreadyThere, created } = await copyWeekInto(schedRef.current, selected, target);
+      if (!alreadyThere) setData(d => ({ ...d, schedule: d.schedule.concat(created) }));
+      setView(null);
+      setSel(target);
+      showToast(alreadyThere ? 'Week of ' + fmtShort(target) + ' is already yours to edit.'
+                             : 'Week of ' + fmtShort(target) + ' ready to edit.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not set next week up.', { kind: 'error' });
+    }
+  };
+
+  const resetWeek = async () => {
+    const ws = weekStartOf(selected);
+    const rows = schedRef.current.filter(r => r.weekOf === ws);
+    if (!rows.length) return;
+    setView(null);
+    // Ten seconds to change your mind before the overlay actually goes.
+    let undone = false;
+    showToast('Resetting week of ' + fmtShort(ws) + ' to the template.', {
+      ms: 10000, action: 'Undo', onAction: () => { undone = true; hideToast(); },
+    });
+    await sleep(10000);
+    if (undone) return;
+    try {
+      await deleteMany(TBL.schedule, rows.map(r => r.id));
+      setData(d => ({ ...d, schedule: d.schedule.filter(r => r.weekOf !== ws) }));
+      showToast('Week of ' + fmtShort(ws) + ' is back on the template.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not reset that week.', { kind: 'error' });
     }
   };
 
@@ -1414,7 +2113,7 @@ function App() {
 
       <div className="scroll" id="list" ref={listRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <NotesRow date={selected} readiness={noteState.readiness} lines={noteState.lines}
-                  onOpen={() => showToast('The Notes page arrives in step 4.', { ms: 2000 })} />
+                  onOpen={() => setView('notes')} />
 
         {lines.map(l => (
           <ExerciseRow key={l.key} line={l}
@@ -1459,14 +2158,72 @@ function App() {
             }}
             onRemove={() => { setOpenKey(null); removeLine(line); }}
             onMove={d => moveLine(line, d)}
-            onLibrary={() => showToast('The Exercises library arrives in step 4.', { ms: 2000 })}
+            onLibrary={() => { setOpenKey(null); setLibEx(data.exById[line.exerciseId]); }}
           />
         );
       })()}
 
+      {view === 'notes' && (
+        <NotesPage
+          date={selected} readiness={noteState.readiness} lines={noteState.lines.slice().reverse()} times={noteTimes}
+          weekNotes={weekDays(selected).filter(d => d !== selected)
+            .map(d => ({ date: d, lines: splitNotes((days[d] || {}).note ? days[d].note.notes : '').lines }))
+            .filter(w => w.lines.length)}
+          onClose={() => setView(null)}
+          onReadiness={r => writeNotes(selected, r, noteState.lines)}
+          onAdd={t => { setNoteTimes(m => ({ ...m, [t]: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }));
+                        writeNotes(selected, noteState.readiness, noteState.lines.concat([t])); }}
+          onDelete={i => {
+            // The list is shown newest first, so map back to stored order.
+            const keep = noteState.lines.slice();
+            const removed = keep.splice(keep.length - 1 - i, 1)[0];
+            writeNotes(selected, noteState.readiness, keep);
+            showToast('Removed note', { action: 'Undo', onAction: () => { hideToast(); writeNotes(selected, noteState.readiness, noteState.lines); } });
+          }}
+          onJump={d => { setView(null); setSel(d); }}
+          onCopy={() => {
+            const text = noteState.lines.join('\n');
+            if (navigator.clipboard) navigator.clipboard.writeText(text).then(
+              () => showToast('Notes copied.'), () => showToast('Could not copy.', { kind: 'error' }));
+            else showToast('Copying is not available here.', { kind: 'error' });
+          }}
+        />
+      )}
+
+      {view === 'races' && <RacesPage races={data.races} onClose={() => setView(null)} />}
+
+      {view === 'exercises' && (
+        <ExercisesPage exercises={data.exercises} schedule={data.schedule} exById={data.exById}
+                       onClose={() => setView(null)} onOpen={e => setLibEx(e)} />
+      )}
+
+      {view === 'search' && (
+        <SearchPage corpus={corpus} notes={corpus.notes} schedule={data.schedule} exById={data.exById}
+                    onClose={() => setView(null)}
+                    onOpenDay={d => { setView(null); setSel(d); }}
+                    onOpenLog={l => {
+                      setView(null);
+                      setSel(l.date);
+                      const found = linesForDate(data.schedule, l.date, data.exById).lines.find(x => x.exerciseId === l.exerciseId);
+                      if (found) setOpenKey(found.key);
+                      else setLibEx(data.exById[l.exerciseId]);
+                    }} />
+      )}
+
+      {view === 'add' && (
+        <AddSheet date={selected} exercises={data.exercises} schedule={data.schedule}
+                  isOverlay={resolved.isOverlay}
+                  onClose={() => setView(null)}
+                  onAdd={addExercise} onCreate={createAndAdd}
+                  onPlanNext={planNextWeek} onResetWeek={resetWeek} />
+      )}
+
+      {libEx && (
+        <LibraryPage exercise={libEx} schedule={data.schedule} onClose={() => setLibEx(null)} />
+      )}
+
       <Toast toast={toast} onAction={() => { if (toast && toast.onAction) toast.onAction(); }} />
-      <BottomBar raceDays={nextRace ? nextRace.days : null} onTheme={toggleTheme}
-                 inert={() => showToast('That screen arrives in step 4.', { ms: 2000 })} />
+      <BottomBar raceDays={nextRace ? nextRace.days : null} onTheme={toggleTheme} onGo={setView} />
     </div>
   );
 }
