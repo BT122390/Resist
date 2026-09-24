@@ -219,6 +219,12 @@
   .ctx .race{display:flex;gap:4px;align-items:baseline}
   .ctx .race .rn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ctx .race .rd{flex:none}
+  .shade.show,.sheet.show{display:block}
+  /* rows sit at z-index 1 so the Remove panel stays behind them, which means
+     the slide-in pages need to clear that. */
+  .pg{z-index:10}
+  .pg .shade,.pg .sheet{z-index:30}
+  .opt .ob b{font-size:16px}
   .chipmini{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 6px;margin-left:6px;background:var(--bar);color:var(--muted)}
   .chipmini[data-amber="amber"]{background:#FEF7E0;color:#B06000}
   .chipmini[data-amber="red"]{background:var(--red-soft);color:var(--red)}
@@ -763,6 +769,226 @@ function BottomBar({ raceDays, onTheme, inert }) {
   );
 }
 
+/* ═══════════════════════ exercise page ═══════════════════════ */
+
+const IcBack = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 5l-7 7 7 7" /></svg>;
+const IcDots = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></svg>;
+const IcNext = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5l7 7-7 7" /></svg>;
+const IcTick = () => <svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-6" fill="none" stroke="currentColor" strokeWidth="2.2" /></svg>;
+
+const PAIN = [0, 1, 2, 3];
+const RPE  = [6, 7, 8, 9, 10];
+
+// "…— paired with RowErg Intervals" in a prescription becomes part of the subline.
+const pairedWith = rx => { const m = String(rx || '').match(/paired with ([^—·\n]+)/i); return m ? 'paired with ' + m[1].trim() : ''; };
+
+// Second quick chip: the last result with its first weight nudged up 5 lb.
+function bumpWeight(text) {
+  const m = String(text).match(/(\d+(?:\.\d+)?)(\s*lb)/i);
+  if (!m) return null;
+  const next = (parseFloat(m[1]) + 5).toString().replace(/\.0$/, '');
+  return text.slice(0, m.index) + next + m[2] + text.slice(m.index + m[0].length);
+}
+
+function Sheet({ children, onClose }) {
+  return (
+    <React.Fragment>
+      <div className="shade show" onClick={onClose} />
+      <div className="sheet show">
+        <div className="grab" onClick={onClose} />
+        {children}
+      </div>
+    </React.Fragment>
+  );
+}
+
+function ExercisePage({ line, index, total, date, exercise, log, prev, next, schedRows,
+                        onClose, onSave, onGo, onSkip, onRemove, onMove, onLibrary }) {
+  const existing = log ? splitResult(log.text) : null;
+  const [text, setText] = useState(existing && !isCompleted(log.text) ? existing.body : '');
+  const [pain, setPain] = useState(existing ? existing.pain : null);
+  const [rpe, setRpe]   = useState(existing ? existing.rpe : null);
+  const [hist, setHist] = useState(null);
+  const [all, setAll]   = useState(false);
+  const [menu, setMenu] = useState(null);      // null | 'menu' | 'move'
+  const [busy, setBusy] = useState(false);
+
+  // Reset when navigating to a neighbour.
+  useEffect(() => {
+    const e = log ? splitResult(log.text) : null;
+    setText(e && !isCompleted(log.text) ? e.body : '');
+    setPain(e ? e.pain : null);
+    setRpe(e ? e.rpe : null);
+    setAll(false);
+  }, [line.key]);  // eslint-disable-line
+
+  useEffect(() => {
+    let live = true;
+    setHist(null);
+    limit(() => atAll(TBL.logs, [
+      ['filterByFormula', '{Exercise} = "' + esc(line.name) + '"'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+    ])).then(rs => { if (live) setHist(rs.map(shapeLog)); })
+       .catch(() => { if (live) setHist([]); });
+    return () => { live = false; };
+  }, [line.name]);
+
+  const past = (hist || []).filter(l => l.date !== date);
+  const lastResult = past.length ? splitResult(past[0].text).body : '';
+  const chips = [];
+  if (lastResult && !isCompleted(past[0].text)) {
+    chips.push(lastResult);
+    const up = bumpWeight(lastResult);
+    if (up) chips.push(up);
+  }
+  chips.push('Skipped');
+
+  const sub = [line.block || line.section, dowName(date), pairedWith(line.prescription)].filter(Boolean).join(' · ');
+
+  const save = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    await onSave(joinResult(text, pain, rpe));
+    setBusy(false);
+  };
+
+  // Horizontal swipe moves to the neighbouring exercise.
+  const g = useRef(null);
+  const down = e => { g.current = { x: e.clientX, y: e.clientY }; };
+  const up = e => {
+    const s = g.current; g.current = null;
+    if (!s) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) onGo(dx < 0 ? next : prev);
+  };
+
+  const shown = all ? past : past.slice(0, 5);
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onClose}><IcBack /></div>
+        <div className="pos">{index + 1} of {total}</div>
+        <div className="pgacts"><div className="ic" onClick={() => setMenu('menu')}><IcDots /></div></div>
+      </div>
+
+      <div className="pgscroll" onPointerDown={down} onPointerUp={up}>
+        <div className="pghead">
+          <div className="av" style={{ background: line.av.color, margin: 0 }}><i>{line.av.letter}</i></div>
+          <div>
+            <div className="pgname">{line.name}</div>
+            <div className="pgsub">{sub}</div>
+          </div>
+        </div>
+
+        <div className="pgfield">
+          <input value={text} placeholder="Log today's result…" onChange={e => setText(e.target.value)}
+                 onKeyDown={e => e.key === 'Enter' && save()} />
+          <div className="save" onClick={save} style={busy ? { opacity: .5 } : null}><IcTick /></div>
+        </div>
+
+        <div className="chips">
+          {chips.map(c => <span key={c} onClick={() => setText(c)}>{c}</span>)}
+        </div>
+
+        <div className="pr">
+          <div className="grp">
+            <small>Pain</small>
+            {PAIN.map(n => (
+              <div key={n} className={'ch' + (pain === n ? ' on' : '') + (pain === n && n >= 2 ? ' amber' : '')}
+                   onClick={() => setPain(pain === n ? null : n)}>{n}</div>
+            ))}
+          </div>
+          <div className="grp">
+            <small>RPE</small>
+            {RPE.map(n => (
+              <div key={n} className={'ch' + (rpe === n ? ' on' : '')} onClick={() => setRpe(rpe === n ? null : n)}>{n}</div>
+            ))}
+          </div>
+        </div>
+
+        {line.prescription && (
+          <div className="sec">
+            <div className="lab">Prescription</div>
+            <p>{line.prescription}</p>
+          </div>
+        )}
+
+        {exercise && exercise.notes && (
+          <div className="sec">
+            <div className="lab">Coaching notes</div>
+            {exercise.notes.split('\n').map(s => s.trim()).filter(Boolean).map((t, i) => <p key={i}>{t}</p>)}
+          </div>
+        )}
+
+        <div className="sec">
+          <div className="lab">History</div>
+          {hist === null && <p className="rule">Loading…</p>}
+          {hist && past.length === 0 && <p className="rule">No results yet.</p>}
+          {shown.map(l => {
+            const r = splitResult(l.text);
+            return (
+              <div className="h" key={l.id}>
+                <span>{fmtShort(l.date)}</span>
+                <span>
+                  {r.body}
+                  {r.pain != null && <span className="chipmini" data-amber={r.pain >= 3 ? 'red' : r.pain >= 2 ? 'amber' : ''}>pain {r.pain}</span>}
+                  {r.rpe != null && <span className="chipmini">RPE {r.rpe}</span>}
+                </span>
+              </div>
+            );
+          })}
+          {hist && !all && past.length > 5 && <div className="more" onClick={() => setAll(true)}>Show all {past.length}</div>}
+        </div>
+      </div>
+
+      <div className="pgnav">
+        <div className="nb" onClick={() => prev && onGo(prev)} style={prev ? null : { opacity: .35 }}>
+          <IcBack />
+          <div><small>Previous</small><b>{prev ? prev.name : '—'}</b></div>
+        </div>
+        <div className="nb r" onClick={() => next && onGo(next)} style={next ? null : { opacity: .35 }}>
+          <div><small>Next</small><b>{next ? next.name : '—'}</b></div>
+          <IcNext />
+        </div>
+      </div>
+
+      {menu === 'menu' && (
+        <Sheet onClose={() => setMenu(null)}>
+          <div className="shead">{line.name}</div>
+          <div className="opt" onClick={() => { setMenu(null); onSkip(); }}>
+            <div className="ob"><b>Skip today</b><small>Logs “Skipped” for {fmtShort(date)}</small></div>
+          </div>
+          <div className="opt" onClick={() => setMenu('move')}>
+            <div className="ob"><b>Move to another day</b><small>This week only</small></div>
+          </div>
+          <div className="opt" onClick={() => { setMenu(null); onRemove(); }}>
+            <div className="ob"><b style={{ color: 'var(--red)' }}>Remove from this week</b><small>The template is left alone</small></div>
+          </div>
+          <div className="opt" onClick={() => { setMenu(null); onLibrary(); }}>
+            <div className="ob"><b>Open in Exercises</b><small>Library entry and full history</small></div>
+          </div>
+        </Sheet>
+      )}
+
+      {menu === 'move' && (
+        <Sheet onClose={() => setMenu(null)}>
+          <div className="shead">Move {line.name} to…</div>
+          {weekDays(date).map(d => (
+            <div className="opt" key={d} onClick={() => { setMenu(null); onMove(d); }}>
+              <div className="av" style={{ background: dayAvatar(dowName(d)).color }}><i>{dayAvatar(dowName(d)).letter}</i></div>
+              <div className="ob">
+                <b>{dowName(d)}</b>
+                <small>{fmtShort(d)}{d === date ? ' · current day' : ''}</small>
+              </div>
+            </div>
+          ))}
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
@@ -804,6 +1030,7 @@ function App() {
   const [hidden, setHidden] = useState({});      // line key -> true while a removal is in flight
   const [orderOf, setOrder] = useState({});      // date -> [line key] while a reorder is in flight
   const [swipeOpen, setSwipeOpen] = useState(null);
+  const [openKey, setOpenKey] = useState(null);   // exercise page
   const [theme, setTheme]   = useState(document.documentElement.dataset.theme);
 
   const today = todayISO();
@@ -967,6 +1194,59 @@ function App() {
         const id = res.records[0].id;
         patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
       } catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that.', { kind: 'error' }); }
+    }
+  };
+
+  /* ---- write a result for one line ---- */
+  const writeResult = useCallback(async (line, date, text) => {
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const existing = snapshot.find(l => l.exerciseId === line.exerciseId);
+    if (existing) {
+      patchDay(date, d => ({ logs: d.logs.map(l => (l.exerciseId === line.exerciseId ? { ...l, text } : l)) }));
+      try { await updateLog(existing.id, text); }
+      catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that result.', { kind: 'error' }); return false; }
+    } else {
+      const tmp = 'tmp:' + Math.random().toString(36).slice(2);
+      patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text }]) }));
+      try {
+        const res = await createLog(line.exerciseId, date, text);
+        const id = res.records[0].id;
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+      } catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that result.', { kind: 'error' }); return false; }
+    }
+    return true;
+  }, [patchDay, showToast]);
+
+  /* ---- move a line to another day of the same week ---- */
+  const moveLine = async (line, toDate) => {
+    const date = selected;
+    if (toDate === date) return;
+    try {
+      const map = await ensureOverlay(date);
+      const rowId = map && map[line.rowId] ? map[line.rowId].id : line.rowId;
+      const row = schedRef.current.find(r => r.id === rowId);
+      if (!row) throw new Error('row not found');
+
+      const toDow = dowName(toDate);
+      const onTarget = schedRef.current.filter(r => r.weekOf === weekStartOf(date) && r.dow === toDow);
+      const order = (onTarget.length ? Math.max(...onTarget.map(r => r.order)) : 0) + 10;
+
+      if (row.exercises.length > 1) {
+        // Take only this exercise across; the row's siblings stay put.
+        const rest = row.exercises.filter(id => id !== line.exerciseId);
+        await setRowExercises(rowId, rest);
+        const made = await createMany(TBL.schedule, [{ ...rowFields(row), 'Day of Week': toDow, 'Order': order, 'Exercise': [line.exerciseId] }]);
+        const fresh = made.map(shapeRow);
+        setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, exercises: rest } : r)).concat(fresh) }));
+      } else {
+        await updateMany(TBL.schedule, [{ id: rowId, fields: { 'Day of Week': toDow, 'Order': order } }]);
+        setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, dow: toDow, order } : r)) }));
+      }
+      setOpenKey(null);
+      showToast('Moved ' + line.name + ' to ' + toDow + '.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not move ' + line.name + '.', { kind: 'error' });
     }
   };
 
@@ -1141,7 +1421,7 @@ function App() {
                        log={logsByEx[l.exerciseId]}
                        last={lastBy[l.exerciseId + '|' + selected]}
                        onToggle={() => toggleLine(l)}
-                       onOpen={() => showToast('The Exercise page arrives in step 3.', { ms: 2000 })}
+                       onOpen={() => setOpenKey(l.key)}
                        onRemove={() => removeLine(l)}
                        onDragStart={onDragStart}
                        swipeOpen={swipeOpen} setSwipeOpen={setSwipeOpen} />
@@ -1153,6 +1433,36 @@ function App() {
           </div>
         )}
       </div>
+
+      {(() => {
+        if (!openKey) return null;
+        const i = lines.findIndex(l => l.key === openKey);
+        if (i < 0) return null;
+        const line = lines[i];
+        return (
+          <ExercisePage
+            line={line} index={i} total={lines.length} date={selected}
+            exercise={data.exById[line.exerciseId]}
+            log={logsByEx[line.exerciseId]}
+            prev={lines[i - 1] || null} next={lines[i + 1] || null}
+            onClose={() => setOpenKey(null)}
+            onGo={l => l && setOpenKey(l.key)}
+            onSave={async text => {
+              const ok = await writeResult(line, selected, text);
+              if (!ok) return;
+              // Saving checks the row and moves on; the last one returns to the list.
+              setOpenKey(lines[i + 1] ? lines[i + 1].key : null);
+            }}
+            onSkip={async () => {
+              await writeResult(line, selected, 'Skipped');
+              setOpenKey(lines[i + 1] ? lines[i + 1].key : null);
+            }}
+            onRemove={() => { setOpenKey(null); removeLine(line); }}
+            onMove={d => moveLine(line, d)}
+            onLibrary={() => showToast('The Exercises library arrives in step 4.', { ms: 2000 })}
+          />
+        );
+      })()}
 
       <Toast toast={toast} onAction={() => { if (toast && toast.onAction) toast.onAction(); }} />
       <BottomBar raceDays={nextRace ? nextRace.days : null} onTheme={toggleTheme}
