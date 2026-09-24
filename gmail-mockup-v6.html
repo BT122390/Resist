@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ledger — gmail style mockup</title>
+<style>
+  :root{
+    --bg:#FFFFFF; --bar:#EEF2F6; --text:#1F1F1F; --muted:#5F6368; --faint:#C4C7CC; --hair:#EEEEEE;
+    --red:#D93025; --blue:#1A73E8; --green:#188038; --green-soft:#E6F4EA; --red-soft:#FCE8E6; --blue-soft:#E8F0FE;
+    --pill:#FFFFFF; --sel:#D93025;
+  }
+  [data-theme="dark"]{
+    --bg:#121212; --bar:#1F1F1F; --text:#E8EAED; --muted:#9AA0A6; --faint:#5F6368; --hair:#2A2A2A;
+    --red:#F28B82; --blue:#8AB4F8; --green:#81C995; --green-soft:#1E3A2A; --red-soft:#3C2320; --blue-soft:#1E2D44;
+    --pill:#2A2A2A; --sel:#F28B82;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Google Sans",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",sans-serif;font-size:16px;line-height:1.4;color:var(--text);background:#000;-webkit-font-smoothing:antialiased}
+  .phone{background:var(--bg);color:var(--text);width:100%;max-width:430px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  @media (min-width:600px){ body{padding:24px 0} .phone{height:calc(100dvh - 48px);border-radius:44px;border:1px solid #333} }
+
+  /* top day bar (in the search-bar slot) */
+  .top{padding:calc(env(safe-area-inset-top) + 10px) 12px 8px}
+  .daybar{background:var(--bar);border-radius:28px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center}
+  .dbtn{width:42px;height:42px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+  .dbtn span{font-size:9px;font-weight:600;letter-spacing:.05em;color:var(--muted)}
+  .dbtn b{font-size:16px;font-weight:500;margin-top:2px}
+  .dbtn.on{background:var(--sel);color:#fff}
+  .dbtn.on span{color:#fff;opacity:.85}
+  .dbtn .d{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:2px}
+  .dbtn.on .d{background:#fff}
+  .ctx{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 6px}
+  .ctx .date{font-size:20px;font-weight:500}
+  .ctx .race{font-size:13px;color:var(--red);font-weight:500}
+
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom) + 96px)}
+  .lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px}
+
+  /* gmail-style rows */
+  .row{display:flex;gap:14px;padding:11px 16px 11px 14px;align-items:flex-start;min-height:72px}
+  .row + .row{border-top:1px solid var(--hair)}
+  .av{width:40px;height:40px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:17px;font-weight:600;margin-top:2px}
+  .av svg{width:18px;height:18px;display:none}
+  .done .av{background:var(--green)!important}
+  .done .av svg{display:block}
+  .done .av i{display:none}
+  .av i{font-style:normal}
+  .c1{background:#7B61FF}.c2{background:#E8710A}.c3{background:#1A73E8}.c4{background:#0B8043}.c5{background:#C5221F}.c6{background:#5F6368}
+  .body{flex:1;min-width:0}
+  .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .t .name{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .done .t .name{font-weight:500;color:var(--muted)}
+  .t .when{font-size:12px;color:var(--muted);flex:none}
+  .done .t .when{color:var(--green);font-weight:600}
+  .p1{font-size:15px;color:var(--text);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p2{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p2 .star{color:#F4B400;margin-right:3px}
+  .row.open .p1,.row.open .p2{white-space:normal}
+  .exp{display:none;padding:0 16px 14px 68px;border-top:0}
+  .row.open + .exp{display:block}
+  .exp .field{display:flex;align-items:center;gap:10px;background:var(--bar);border-radius:24px;padding:8px 8px 8px 16px;font-size:16px;min-height:48px;margin-top:4px}
+  .exp .field span{flex:1;color:var(--faint)}
+  .exp .save{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;flex:none}
+  .exp .save svg{width:15px;height:15px}
+  .exp .lab{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 4px}
+  .exp p{font-size:15px}
+  .exp .h{display:flex;gap:12px;font-size:15px;padding:4px 0}
+  .exp .h span:first-child{color:var(--muted);width:56px;flex:none;font-size:13px;padding-top:2px}
+
+  /* notes row */
+  .row.note .av{background:var(--bar);color:var(--muted)}
+
+
+
+
+
+  .ready{display:flex;align-items:center;gap:10px;padding:2px 16px 8px}
+  .ready .rl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+  .rc{width:22px;height:22px;border-radius:50%;border:2px solid transparent;opacity:.45}
+  .rc.g{background:var(--green)}.rc.y{background:#F9AB00}.rc.r{background:var(--red)}
+  .rc.on{opacity:1;box-shadow:0 0 0 2px var(--bg),0 0 0 4px currentColor}
+  .rc.g.on{color:var(--green)}.rc.y.on{color:#F9AB00}.rc.r.on{color:var(--red)}
+  .ready .rt{font-size:13px;color:var(--muted);margin-left:2px}
+  /* undo toast */
+  .toast{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 84px);background:#323232;color:#fff;border-radius:8px;padding:12px 16px;font-size:15px;display:none;justify-content:space-between;align-items:center;z-index:15;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .toast.on{display:flex}
+  .toast b{color:#8AB4F8;font-weight:600}
+  /* pain / rpe chips */
+  .pr{display:flex;gap:14px;margin:10px 0 4px;flex-wrap:wrap}
+  .pr .grp{display:flex;align-items:center;gap:6px}
+  .pr .grp small{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-right:2px}
+  .pr .ch{width:30px;height:30px;border-radius:50%;border:1px solid var(--hair);display:grid;place-items:center;font-size:13px;font-weight:500}
+  .pr .ch.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .pr .ch.on.amber{background:#F9AB00;border-color:#F9AB00}
+
+
+  .rdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .rdot.g{background:var(--green)}.rdot.y{background:#F9AB00}.rdot.r{background:var(--red)}
+  #list .row.note{border-top:0;margin-top:0;border-bottom:1px solid var(--hair);background:var(--bar)}
+  .nl{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}
+  .nl span{color:var(--muted);font-size:13px;width:60px;flex:none;padding-top:2px;font-weight:600}
+  .nl p{font-size:16px;line-height:1.45}
+  #np .ready{padding:0 0 4px}
+
+  /* swipe + drag */
+  .sw{position:relative;overflow:hidden;border-top:1px solid var(--hair)}
+  .sw:first-child{border-top:0}
+  .sw .row{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y}
+  .sw .del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--red);color:#fff;font-weight:600;display:grid;place-items:center;font-size:15px}
+  .row + .row{border-top:0}
+  .hdl{width:28px;align-self:stretch;display:grid;place-items:center;color:var(--faint);flex:none;margin:-11px -6px -11px 0;touch-action:none;cursor:grab}
+  .hdl svg{width:18px;height:18px;fill:currentColor}
+  .sw.lift .row{box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:5}
+  .sw.gap-top{border-top:2px solid var(--blue)}
+  .sw.gap-bot{border-bottom:2px solid var(--blue)}
+  #list{padding-top:2px}
+  #list .row.note{border-top:1px solid var(--hair);margin-top:6px}
+  /* add sheet */
+  .shade{display:none;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:20}
+  .sheet{display:none;position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom) + 16px);z-index:21;max-height:78%;overflow-y:auto}
+  .open-add .shade,.open-add .sheet{display:block}
+  .grab{width:38px;height:5px;border-radius:3px;background:var(--faint);margin:0 auto 12px}
+  .shead{font-size:18px;font-weight:600;margin-bottom:10px}
+  .opt{display:flex;align-items:center;gap:14px;padding:11px 4px;border-top:1px solid var(--hair)}
+  .opt .av{margin:0;width:36px;height:36px;font-size:15px}
+  .opt .ob{flex:1;min-width:0}
+  .opt b{display:block;font-size:16px;font-weight:600}
+  .opt small{display:block;font-size:13px;color:var(--muted)}
+  .opt .plus{width:32px;height:32px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:20px}
+  .opt.new .av{background:var(--bar);color:var(--muted)}
+  .scope{display:flex;background:var(--bar);border-radius:12px;padding:3px;margin-top:14px}
+  .scope span{flex:1;text-align:center;font-size:14px;font-weight:500;padding:8px 0;border-radius:9px;color:var(--muted)}
+  .scope span.on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  /* search */
+  .sbar{padding:4px 6px 4px 4px;gap:6px}
+  .sbar .back{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--text)}
+  .sbar .back svg{width:22px;height:22px}
+  .sin{flex:1;border:0;background:transparent;font:inherit;font-size:17px;color:var(--text);outline:none;min-width:0}
+  .clr{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:22px;flex:none}
+  .weeks{display:flex;gap:8px;padding:10px 16px 4px;overflow-x:auto;scrollbar-width:none}
+  .weeks::-webkit-scrollbar{display:none}
+  .wk{flex:none;font-size:13px;font-weight:500;border:1px solid var(--hair);border-radius:16px;padding:6px 12px;color:var(--text)}
+  .wk.on{background:var(--blue-soft);border-color:var(--blue-soft);color:var(--blue)}
+  .smode{display:none}.smode.on{display:block}
+  .jday{font-size:13px;font-weight:600;color:var(--muted);padding:16px 16px 4px;letter-spacing:.02em}
+  #sp .row{min-height:64px}
+  #sp .pgscroll{padding:0 0 calc(env(safe-area-inset-bottom) + 24px)}
+
+  /* exercise page */
+  .pg{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
+  .pg.on{display:flex;transform:translateX(0)}
+  .pgtop{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 12px 8px}
+  .pgtop .back,.pgtop .ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--text)}
+  .pgtop .back svg,.pgtop .ic svg{width:24px;height:24px}
+  .pgtop .pos{font-size:14px;color:var(--muted);font-weight:500}
+  .pgacts{display:flex}
+  .pgscroll{flex:1;overflow-y:auto;padding:4px 16px calc(env(safe-area-inset-bottom) + 100px)}
+  .pghead{display:flex;gap:14px;align-items:center;padding:8px 0 16px}
+  .pgname{font-size:22px;font-weight:600;line-height:1.2}
+  .pgsub{font-size:14px;color:var(--muted);margin-top:2px}
+  .pgfield{display:flex;align-items:center;gap:10px;background:var(--bar);border-radius:26px;padding:8px 8px 8px 18px;font-size:17px;min-height:52px}
+  .pgfield .ph{flex:1;color:var(--faint)}
+  .pgfield .save{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;flex:none}
+  .pgfield .save svg{width:16px;height:16px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+  .chips span{font-size:13px;font-weight:500;border:1px solid var(--hair);border-radius:16px;padding:6px 12px;color:var(--text);background:var(--bg)}
+  .sec{padding:16px 0 4px;border-top:1px solid var(--hair);margin-top:12px}
+  .sec .lab{padding:0 0 6px}
+  .sec p{font-size:16px;line-height:1.5}
+  .sec p + p{margin-top:8px}
+  .sec .rule{color:var(--muted);font-size:15px}
+  .sec .h{display:flex;gap:12px;font-size:16px;padding:7px 0;border-bottom:1px solid var(--hair)}
+  .sec .h span:first-child{color:var(--muted);width:60px;flex:none;font-size:13px;padding-top:3px;font-weight:600}
+  .sec .more{color:var(--blue);font-size:14px;font-weight:600;padding:12px 0 4px}
+  .pgnav{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--hair);display:flex;padding:8px 8px calc(env(safe-area-inset-bottom) + 10px);gap:8px}
+  .nb{flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:14px;min-width:0}
+  .nb.r{justify-content:flex-end;text-align:right}
+  .nb svg{width:20px;height:20px;color:var(--muted);flex:none}
+  .nb small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .nb b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nb div{min-width:0}
+
+  /* bottom bar */
+  .bot{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--hair);padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);display:flex;justify-content:space-between}
+  .bb{width:60px;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .bb .c{width:44px;height:44px;border-radius:50%;background:var(--bar);display:grid;place-items:center;color:var(--text);position:relative}
+  .bb .c svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+  .bb .c.add{background:var(--blue);color:#fff}
+  .bb .c .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px}
+  .bb small{font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="phone" id="phone" data-theme="light">
+
+  <div class="top">
+    <div class="daybar">
+      <div class="dbtn"><span>MON</span><b>21</b><div class="d"></div></div>
+      <div class="dbtn"><span>TUE</span><b>22</b><div class="d"></div></div>
+      <div class="dbtn on"><span>WED</span><b>23</b><div class="d"></div></div>
+      <div class="dbtn"><span>THU</span><b>24</b></div>
+      <div class="dbtn"><span>FRI</span><b>25</b></div>
+      <div class="dbtn"><span>SAT</span><b>26</b></div>
+      <div class="dbtn"><span>SUN</span><b>27</b></div>
+    </div>
+  </div>
+  <div class="ctx"><div class="date">Wednesday, September 23</div><div class="race">Moab 240 · 10d</div></div>
+
+  <div class="scroll" id="list">
+    <div class="row note" onclick="notes(true)"><div class="av"><i>✎</i></div><div class="body"><div class="t"><div class="name">Wednesday notes</div><div class="when"><span class="rdot g"></span>Green</div></div><div class="p1">Cold plunge 3 min post-session — legs still heavy from Saturday</div><div class="p2">Pack list for Moab travel started</div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row done" onclick="page(true)"><div class="av c6" onclick="chk(event,this)"><i>W</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Loaded Tibialis Anterior Raise</div><div class="when">Done</div></div><div class="p1">2×10 per side @ 10 lb KB</div><div class="p2">Today: 2×10 @ 10 lb</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row done" onclick="page(true)"><div class="av c6" onclick="chk(event,this)"><i>W</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Kneeling Hip Flexor Stretch</div><div class="when">Done</div></div><div class="p1">60 seconds per leg</div><div class="p2">Today: 60s each</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c6" onclick="chk(event,this)"><i>W</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Med Ball Rotational Throws</div><div class="when">Sep 16</div></div><div class="p1">3×8 each side · Overhead Slams 3×6 @ 8–10 lb</div><div class="p2">Last: 3×8 @ 12 lb, slams 3×6 @ 10 lb</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c2" onclick="chk(event,this)"><i>S</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Backward Sled Drags</div><div class="when">Sep 16</div></div><div class="p1">4×40m @ Match P1 peak</div><div class="p2">Last: 4×40m @ 180</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c2" onclick="chk(event,this)"><i>S</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Sled Pushes</div><div class="when">Sep 16</div></div><div class="p1">4×40m @ Match P1 peak push</div><div class="p2">Last: 4×40m @ 135</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c3" onclick="chk(event,this)"><i>A</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Sep 16</div></div><div class="p1">4 rounds @ vest 10–15 lb — paired with RowErg Intervals</div><div class="p2">Last: 4×12 @ 15 lb vest, full depth</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c3" onclick="chk(event,this)"><i>A</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Concept2 RowErg Intervals</div><div class="when">Sep 16</div></div><div class="p1">4 rounds @ 500m hard / 90s easy</div><div class="p2">Last: 1:52 / 1:54 / 1:55 / 1:57</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c1" onclick="chk(event,this)"><i>B</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">SkiErg Sprint Intervals</div><div class="when">Sep 16</div></div><div class="p1">4 rounds @ 30s on / 30s rest</div><div class="p2">Last: 4 rounds, damper 6</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c1" onclick="chk(event,this)"><i>B</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">DB/KB Farmer's or Suitcase Carry</div><div class="when">Sep 16</div></div><div class="p1">4 rounds · 30s carry / 30s rest @ 55–62 lb/hand</div><div class="p2">Last: 4 rounds @ 62 lb bilateral</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c4" onclick="chk(event,this)"><i>M</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">Weighted Pull-Ups</div><div class="when">Sep 16</div></div><div class="p1">3×8 @ +10 lb towel + L-sit hold 2s</div><div class="p2">Last: 3×8 @ +10 lb, L-sit knees bent</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+    <div class="sw"><div class="del">Remove</div><div class="row" onclick="page(true)"><div class="av c5" onclick="chk(event,this)"><i>F</i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><div class="body"><div class="t"><div class="name">SkiErg Metabolic Mind Finisher</div><div class="when">Sep 16</div></div><div class="p1">5 min @ 30s on / 30s off — recall card during rest</div><div class="p2"><span class="star">★</span>Benchmark 2000m due Oct 7 · Last: 5/5 recalled</div></div><div class="hdl" onpointerdown="dragStart(event)"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg></div></div></div>
+  </div>
+
+
+
+  <!-- ============ SEARCH ============ -->
+  <div class="pg" id="sp">
+    <div class="top">
+      <div class="daybar sbar">
+        <div class="back" onclick="search(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></div>
+        <input class="sin" id="sin" value="slant board" oninput="mode('ex')">
+        <div class="clr" onclick="document.getElementById('sin').value='';mode('wk')">×</div>
+      </div>
+    </div>
+    <div class="weeks">
+      <span class="wk" onclick="mode('wk',this)">This week</span>
+      <span class="wk on" onclick="mode('wk',this)">Sep 14–20</span>
+      <span class="wk" onclick="mode('wk',this)">Sep 7–13</span>
+      <span class="wk" onclick="mode('wk',this)">Aug 31–Sep 6</span>
+      <span class="wk" onclick="mode('wk',this)">Aug 24–30</span>
+    </div>
+
+    <div class="pgscroll">
+      <!-- exercise results -->
+      <div class="smode on" id="m-ex">
+        <div class="lbl">Slant Board Squats · 14 results</div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Sep 16</div></div><div class="p1">4×12 @ 15 lb vest, full depth</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Sep 9</div></div><div class="p1">4×12 @ 15 lb vest</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Sep 2</div></div><div class="p1">4×12 @ 10 lb vest</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Aug 26</div></div><div class="p1">4×12 @ 10 lb vest — first weighted</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Aug 19</div></div><div class="p1">4×15 BW</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="row" onclick="page(true)"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">Slant Board Squats</div><div class="when">Aug 12</div></div><div class="p1">4×15 BW, knee 1/10 on set 3 — reduced angle</div><div class="p2">Wednesday · Block A</div></div></div>
+        <div class="lbl" style="padding-top:22px">Also matches</div>
+        <div class="row"><div class="av c6"><i>N</i></div><div class="body"><div class="t"><div class="name">Wednesday notes</div><div class="when">Aug 12</div></div><div class="p1">Slant board angle dropped one notch — knee settled by set 4</div><div class="p2">Day note</div></div></div>
+      </div>
+
+      <!-- week view -->
+      <div class="smode" id="m-wk">
+        <div class="lbl">Sep 14–20 · 31 logs · 5 of 7 days</div>
+
+        <div class="jday">Saturday, Sep 19</div>
+        <div class="row"><div class="av c4"><i>M</i></div><div class="body"><div class="t"><div class="name">Long Ruck with Power Bursts</div><div class="when">16 hr</div></div><div class="p1">38 lb · 16 hr sim with Cam · 38°F low, layers held · forefoot clean</div><div class="p2">+ Pre-Ruck Primer, Glute Bridge, Hip Flexor March</div></div></div>
+        <div class="row note"><div class="av"><i>✎</i></div><div class="body"><div class="p1">Cold-layer kit: merino base, Alpha fleece, shell. Swap at 2am checkpoint.</div><div class="p2">Forefoot pre-taped — standard.</div></div></div>
+
+        <div class="jday">Friday, Sep 18</div>
+        <div class="row"><div class="av c4"><i>M</i></div><div class="body"><div class="t"><div class="name">Staircase Chase</div><div class="when">4 rds</div></div><div class="p1">4 rounds @ 38 lb, poles. Legs fresh.</div><div class="p2">+ Pallof Press, Reverse Hypers · <s>Balance Reach</s></div></div></div>
+
+        <div class="jday">Thursday, Sep 17</div>
+        <div class="row"><div class="av c4"><i>M</i></div><div class="body"><div class="t"><div class="name">Trap Bar Sumo RDL</div><div class="when">205</div></div><div class="p1">3×8 @ 205</div><div class="p2">+ Rope Pulls, SL KB Raises, Decline Block, Wall Ball Carry</div></div></div>
+
+        <div class="jday">Wednesday, Sep 16</div>
+        <div class="row"><div class="av c3"><i>A</i></div><div class="body"><div class="t"><div class="name">The Forge</div><div class="when">10 logs</div></div><div class="p1">Slant Board 4×12 @ 15 · RowErg 1:52–1:57 · Sled 180/135</div><div class="p2">+ SkiErg sprints, Carry 62, Pull-Ups +10, Finisher 5/5</div></div></div>
+
+        <div class="jday">Tuesday, Sep 15</div>
+        <div class="row"><div class="av c4"><i>M</i></div><div class="body"><div class="t"><div class="name">Hill Tax</div><div class="when">7 logs</div></div><div class="p1">Step-Ups 4×10 @ 35 · Negatives 3×8 @ 20 + hold · HIITMill 40 min 3/1, PB&amp;J</div><div class="p2">+ Tib Raise, GHD Glute-Ham, Box Landings</div></div></div>
+
+        <div class="jday">Monday, Sep 14</div>
+        <div class="row"><div class="av c4"><i>M</i></div><div class="body"><div class="t"><div class="name">Iron Roots</div><div class="when">11 logs</div></div><div class="p1">Box Squat 3×3 @ 245 · Power Clean 3×5 @ 155 · Dead Hang 3×75s offset</div><div class="p2">+ 8 accessory · SkiErg finisher</div></div></div>
+
+        <div class="jday" style="color:var(--faint)">Sunday, Sep 20 — no logs</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============ NOTES PAGE ============ -->
+  <div class="pg" id="np">
+    <div class="pgtop">
+      <div class="back" onclick="notes(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <div class="pos">Wednesday, Sep 23</div>
+      <div class="pgacts"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></div></div>
+    </div>
+    <div class="pgscroll">
+      <div class="pgname" style="padding:6px 0 14px">Notes</div>
+      <div class="ready"><span class="rl">Readiness</span><div class="rc g on" onclick="rd(this)"></div><div class="rc y" onclick="rd(this)"></div><div class="rc r" onclick="rd(this)"></div><span class="rt">Green — execute as written</span></div>
+      <div class="pgfield" style="margin-top:8px"><span class="ph">Add a note…</span><div class="save"><svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></div></div>
+      <div class="sec">
+        <div class="nl"><span>6:12 AM</span><p>Cold plunge 3 min post-session — legs still heavy from Saturday</p></div>
+        <div class="nl"><span>5:40 AM</span><p>Pack list for Moab travel started</p></div>
+      </div>
+      <div class="sec">
+        <div class="lab">Earlier this week</div>
+        <div class="nl"><span>Tue</span><p>PB&amp;J on HIITMill — GI fine. Approve for race list.</p></div>
+        <div class="nl"><span>Mon</span><p>Box squat 245 felt like RPE 7. Hold load next week.</p></div>
+        <div class="nl"><span>Sat</span><p>Cold-layer kit: merino base, Alpha fleece, shell. Swap at 2am checkpoint.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EXERCISE PAGE ============ -->
+  <div class="pg" id="pg">
+    <div class="pgtop">
+      <div class="back" onclick="page(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></div>
+      <div class="pos">6 of 12</div>
+      <div class="pgacts">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></div>
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></div>
+      </div>
+    </div>
+    <div class="pgscroll">
+      <div class="pghead">
+        <div class="av c3" style="margin:0"><i>A</i></div>
+        <div>
+          <div class="pgname">Slant Board Squats</div>
+          <div class="pgsub">Block A · Wednesday · paired with RowErg Intervals</div>
+        </div>
+      </div>
+
+      <div class="pgfield"><span class="ph">Log today's result…</span><div class="save"><svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></div></div>
+      <div class="chips"><span>4×12 @ 15 lb vest</span><span>4×12 @ 20 lb vest</span><span>Skipped</span></div>
+      <div class="pr"><div class="grp"><small>Pain</small><div class="ch on">0</div><div class="ch">1</div><div class="ch">2</div><div class="ch">3</div></div><div class="grp"><small>RPE</small><div class="ch">6</div><div class="ch">7</div><div class="ch on">8</div><div class="ch">9</div><div class="ch">10</div></div></div>
+
+      <div class="sec">
+        <div class="lab">Prescription</div>
+        <p>4 rounds @ weighted vest 10–15 lb — one set per round, alternating with Concept2 RowErg Intervals (Block A).</p>
+      </div>
+      <div class="sec">
+        <div class="lab">Coaching notes</div>
+        <p>Feet on an inclined slant board, heels elevated, toes down-slope — this locks the ankle into dorsiflexion and shifts load onto the quad tendon at close to the ankle angle used descending steep terrain. The plan's most direct simulation of that loading pattern.</p>
+        <p>Full depth, controlled 3s descent, brief pause at the bottom without relaxing, then drive up.</p>
+        <p>P2 W1–6: 4×12 @ vest 10–15 lb. P2 W7–12: 4×15 @ vest 15–20 lb. P3: 4×12 @ vest 20–25 lb, or add a 2–3s pause instead of load once vest weight plateaus.</p>
+        <p class="rule">Never increase load and add a pause in the same week. If knee pain develops, reduce the slant angle before reducing load.</p>
+      </div>
+      <div class="sec">
+        <div class="lab">History</div>
+        <div class="h"><span>Sep 16</span><span>4×12 @ 15 lb vest, full depth</span></div>
+        <div class="h"><span>Sep 9</span><span>4×12 @ 15 lb vest</span></div>
+        <div class="h"><span>Sep 2</span><span>4×12 @ 10 lb vest</span></div>
+        <div class="h"><span>Aug 26</span><span>4×12 @ 10 lb vest — first weighted</span></div>
+        <div class="h"><span>Aug 19</span><span>4×15 BW</span></div>
+        <div class="more">Show all 14</div>
+      </div>
+    </div>
+    <div class="pgnav">
+      <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg><div><small>Previous</small><b>Sled Pushes</b></div></div>
+      <div class="nb r"><div><small>Next</small><b>Concept2 RowErg Intervals</b></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+    </div>
+  </div>
+
+
+  <!-- ============ ADD SHEET ============ -->
+  <div class="shade" onclick="addSheet(false)"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="shead">Add to Wednesday, Sep 23</div>
+    <div class="daybar sbar" style="margin-bottom:8px"><svg style="width:20px;height:20px;margin-left:10px;color:var(--muted);flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg><input class="sin" placeholder="Search exercises" value="step"></div>
+    <div class="opt"><div class="av c2"><i>T</i></div><div class="ob"><b>Weighted Step-Ups</b><small>Tuesday · 4×10 each side @ P1 peak</small></div><div class="plus">+</div></div>
+    <div class="opt"><div class="av c2"><i>T</i></div><div class="ob"><b>Weighted Step-Down Negatives</b><small>Tuesday · 3×8 + 3s hold</small></div><div class="plus">+</div></div>
+    <div class="opt"><div class="av c4"><i>M</i></div><div class="ob"><b>Peterson Step-Downs</b><small>Monday · 3×10 @ 10–15 lb/hand</small></div><div class="plus">+</div></div>
+    <div class="opt new"><div class="av"><i>+</i></div><div class="ob"><b>Create "step"</b><small>New exercise — added to the library</small></div></div>
+    <div class="scope"><span class="on">This week only</span><span>Every Wednesday</span></div>
+    <div class="opt" style="margin-top:8px"><div class="av" style="background:var(--blue-soft);color:var(--blue)"><i>→</i></div><div class="ob"><b>Plan next week</b><small>Copy this week to Sep 28 – Oct 4 and open it for editing</small></div></div>
+  </div>
+
+  <div class="toast" id="toast"><span>Removed Med Ball Rotational Throws</span><b>Undo</b></div>
+  <div class="bot">
+    <div class="bb"><div class="c"><svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg></div><small>Exercises</small></div>
+    <div class="bb"><div class="c"><svg viewBox="0 0 24 24"><path d="M5 3v18M5 4h11l-2 3 2 3H5"/></svg><div class="badge">10</div></div><small>Races</small></div>
+    <div class="bb" onclick="search(true)"><div class="c"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg></div><small>Search</small></div>
+    <div class="bb"><div class="c" onclick="theme()"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z"/></svg></div><small>Theme</small></div>
+    <div class="bb" onclick="addSheet(true)"><div class="c add"><svg viewBox="0 0 24 24" stroke="#fff"><path d="M12 5v14M5 12h14"/></svg></div><small>Add</small></div>
+  </div>
+</div>
+
+<script>
+
+
+  function rd(el){ const on=el.classList.contains('on'); document.querySelectorAll('.rc').forEach(c=>c.classList.remove('on')); const t=document.querySelector('.ready .rt'); if(on){ t.textContent='Tap to set'; return; } el.classList.add('on'); const w=document.querySelector('#list .row.note .when'); const k=el.classList.contains('g')?'g':el.classList.contains('y')?'y':'r'; if(w) w.innerHTML='<span class="rdot '+k+'"></span>'+({g:'Green',y:'Yellow',r:'Red'})[k]; t.textContent = el.classList.contains('g')?'Green — execute as written': el.classList.contains('y')?'Yellow — reduce intensity':'Red — replace the session'; }
+  function toast(name){ const t=document.getElementById('toast'); t.firstChild.textContent='Removed '+name; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),5000); }
+  function notes(o){ document.getElementById('np').classList.toggle('on', o); }
+  function addSheet(o){ document.getElementById('phone').classList.toggle('open-add', o); }
+  (function(){
+    let sx=0, cur=null, moved=false;
+    document.querySelectorAll('#list .sw .row').forEach(r=>{
+      r.addEventListener('pointerdown', e=>{ if(e.target.closest('.hdl')||e.target.closest('.av')) return; sx=e.clientX; cur=r; moved=false; r.style.transition='none'; });
+      r.addEventListener('pointermove', e=>{ if(cur!==r) return; const dx=Math.min(0,e.clientX-sx); if(Math.abs(dx)>6) moved=true; r.style.transform=`translateX(${Math.max(dx,-110)}px)`; });
+      const end=e=>{ if(cur!==r) return; r.style.transition=''; const dx=e.clientX-sx;
+        if(dx<-140){ r.style.transform='translateX(-100%)'; toast(r.querySelector('.name').textContent); setTimeout(()=>r.parentElement.remove(),180); }
+        else if(dx<-50){ r.style.transform='translateX(-96px)'; }
+        else { r.style.transform=''; }
+        cur=null; };
+      r.addEventListener('pointerup', end); r.addEventListener('pointercancel', end);
+      r.addEventListener('click', e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; } }, true);
+    });
+    document.querySelectorAll('#list .del').forEach(d=>d.addEventListener('click', ()=>{ const sw=d.parentElement; toast(sw.querySelector('.name').textContent); sw.querySelector('.row').style.transform='translateX(-100%)'; setTimeout(()=>sw.remove(),180); }));
+  })();
+  let drag=null;
+  function dragStart(e){
+    e.preventDefault(); e.stopPropagation();
+    drag=e.target.closest('.sw'); drag.classList.add('lift');
+    const move=ev=>{ const items=[...document.querySelectorAll('#list .sw')].filter(x=>x!==drag);
+      items.forEach(x=>x.classList.remove('gap-top','gap-bot'));
+      const y=ev.clientY; let target=null, before=true;
+      for(const it of items){ const b=it.getBoundingClientRect(); if(y<b.top+b.height/2){ target=it; before=true; break; } target=it; before=false; }
+      if(target){ target.classList.add(before?'gap-top':'gap-bot'); drag._t=target; drag._b=before; } };
+    const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up);
+      if(drag._t){ drag._b ? drag._t.before(drag) : drag._t.after(drag); }
+      document.querySelectorAll('#list .sw').forEach(x=>x.classList.remove('gap-top','gap-bot','lift')); drag=null; };
+    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+  }
+
+  function search(o){ document.getElementById('sp').classList.toggle('on', o); }
+  function mode(m, el){
+    const q = document.getElementById('sin').value.trim();
+    const useEx = m==='ex' && q.length>0;
+    document.getElementById('m-ex').classList.toggle('on', useEx);
+    document.getElementById('m-wk').classList.toggle('on', !useEx);
+    if(el){ document.querySelectorAll('.wk').forEach(w=>w.classList.remove('on')); el.classList.add('on'); document.getElementById('sin').value=''; }
+  }
+  function page(o){ document.getElementById('pg').classList.toggle('on', o); }
+  function chk(ev, av){ ev.stopPropagation(); const row = av.closest('.row'); row.classList.toggle('done'); const w = row.querySelector('.when'); if(w) w.textContent = row.classList.contains('done') ? 'Done' : 'Sep 16'; }
+  function theme(){ const p=document.getElementById('phone'); p.dataset.theme = p.dataset.theme==='dark'?'light':'dark'; }
+  if(matchMedia('(prefers-color-scheme: dark)').matches) document.getElementById('phone').dataset.theme='dark';
+</script>
+</body>
+</html>

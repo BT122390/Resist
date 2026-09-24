@@ -7,147 +7,216 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ledger">
-<meta name="theme-color" content="#1C1C1E">
+<meta name="theme-color" content="#FFFFFF">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Ledger</title>
 <style>
+
   :root{
-    --hdr:#1C1C1E; --hdr-text:#FFFFFF; --hdr-muted:#9A9AA0;
-    --bg:#F2F2F6; --card:#FFFFFF; --text:#1C1C1E; --muted:#6E6E73; --faint:#C7C7CC;
-    --red:#E5484D; --red-soft:#FDE8E8; --green:#2FA46A; --green-soft:#E3F6EA; --hair:#ECECF0;
+    --bg:#FFFFFF; --bar:#EEF2F6; --text:#1F1F1F; --muted:#5F6368; --faint:#C4C7CC; --hair:#EEEEEE;
+    --red:#D93025; --blue:#1A73E8; --green:#188038; --green-soft:#E6F4EA; --red-soft:#FCE8E6; --blue-soft:#E8F0FE;
+    --pill:#FFFFFF; --sel:#D93025;
   }
   [data-theme="dark"]{
-    --hdr:#000000; --bg:#0F0F11; --card:#1C1C1E; --text:#F2F2F5; --muted:#9A9AA0; --faint:#4A4A50;
-    --red:#F0575C; --red-soft:#3A1E20; --green:#4FC37F; --green-soft:#17302A; --hair:#2A2A2E;
+    --bg:#121212; --bar:#1F1F1F; --text:#E8EAED; --muted:#9AA0A6; --faint:#5F6368; --hair:#2A2A2A;
+    --red:#F28B82; --blue:#8AB4F8; --green:#81C995; --green-soft:#1E3A2A; --red-soft:#3C2320; --blue-soft:#1E2D44;
+    --pill:#2A2A2A; --sel:#F28B82;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;font-size:17px;line-height:1.4;color:var(--text);background:#000;-webkit-font-smoothing:antialiased}
-  .phone{background:var(--bg);width:100%;max-width:430px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  body{font-family:"Google Sans",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",sans-serif;font-size:16px;line-height:1.4;color:var(--text);background:#000;-webkit-font-smoothing:antialiased}
+  .phone{background:var(--bg);color:var(--text);width:100%;max-width:430px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden}
   @media (min-width:600px){ body{padding:24px 0} .phone{height:calc(100dvh - 48px);border-radius:44px;border:1px solid #333} }
 
-  /* header */
-  .hdr{background:var(--hdr);color:var(--hdr-text);padding:calc(env(safe-area-inset-top) + 14px) 20px 14px;border-radius:0 0 22px 22px}
-  .hdr .row1{display:flex;justify-content:space-between;align-items:center}
-  .hdr .race{font-size:13px;font-weight:600;color:var(--hdr-muted);display:flex;gap:6px;align-items:center}
-  .hdr .race b{color:var(--red)}
-  .hdr .icons{display:flex;gap:16px;align-items:center}
-  .hdr .icons svg{width:22px;height:22px;stroke:var(--hdr-text);fill:none;stroke-width:1.8}
-  .tog{width:40px;height:22px;border-radius:11px;background:#3A3A3E;position:relative}
-  .tog i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
-  [data-theme="dark"] .tog{background:var(--red)} [data-theme="dark"] .tog i{left:20px}
-  .hdr .title{text-align:center;font-size:22px;font-weight:700;margin:16px 0 14px;letter-spacing:-.01em}
-  .hdr .title small{display:block;font-size:13px;font-weight:600;color:var(--hdr-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}
-  .week{display:flex;justify-content:space-between}
-  .week div{text-align:center;flex:1;padding:4px 0;border-radius:10px}
-  .week span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--hdr-muted)}
-  .week b{display:block;font-size:19px;font-weight:600;margin-top:2px}
-  .week .on b, .week .on span{color:var(--red)}
-  .week .sel{background:#2C2C2E}
-  .week .dot{width:5px;height:5px;border-radius:50%;background:var(--green);margin:3px auto 0}
+  /* top day bar (in the search-bar slot) */
+  .top{padding:calc(env(safe-area-inset-top) + 10px) 12px 8px}
+  .daybar{background:var(--bar);border-radius:28px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center}
+  .dbtn{width:42px;height:42px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+  .dbtn span{font-size:9px;font-weight:600;letter-spacing:.05em;color:var(--muted)}
+  .dbtn b{font-size:16px;font-weight:500;margin-top:2px}
+  .dbtn.on{background:var(--sel);color:#fff}
+  .dbtn.on span{color:#fff;opacity:.85}
+  .dbtn .d{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:2px}
+  .dbtn.on .d{background:#fff}
+  .ctx{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 6px}
+  .ctx .date{font-size:20px;font-weight:500}
+  .ctx .race{font-size:13px;color:var(--red);font-weight:500}
 
-  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom) + 90px)}
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom) + 96px)}
+  .lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px}
 
-  /* cards */
-  .card{background:var(--card);border-radius:18px;padding:16px 16px 14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-  .card h3{font-size:19px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
-  .card h3 small{font-size:13px;font-weight:600;color:var(--muted)}
-  .card .desc{color:var(--muted);font-size:16px;margin-top:2px}
-  .lines{margin-top:10px}
-  .ln{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--hair);min-height:44px}
-  .ln .cb{width:22px;height:22px;border-radius:50%;border:2px solid var(--faint);flex:none;display:grid;place-items:center}
-  .ln .cb svg{width:12px;height:12px;color:#fff;display:none}
-  .ln.done .cb{background:var(--green);border-color:var(--green)}
-  .ln.done .cb svg{display:block}
-  .ln .n{flex:1;font-size:18px;font-weight:500}
-  .ln.done .n{color:var(--muted)}
-  .ln .chev{width:12px;height:12px;color:var(--faint);transition:transform .15s}
-  .ln.open .chev{transform:rotate(180deg)}
-  .rx{padding:0 0 10px 34px;color:var(--muted);font-size:16px}
-  .ln .retry{color:var(--red);font-size:14px;font-weight:600;flex:none;padding:0 4px}
-  .sheet .hist{padding:10px 0;border-top:1px solid var(--hair);font-size:15px;color:var(--muted)}
-  .sheet .hist b{display:block;color:var(--text);font-weight:600;font-size:16px;margin-bottom:2px}
-  .rx b{color:var(--text);font-weight:500}
-  .btns{display:flex;gap:10px;margin-top:12px}
-  .btns{gap:8px}
-  .btn{flex:1;background:var(--red-soft);color:var(--red);font-weight:600;font-size:15px;border-radius:12px;padding:13px 6px;display:flex;align-items:center;justify-content:center;gap:6px;border:0;font-family:inherit;min-height:44px;white-space:nowrap}
-  .btn .ic{width:19px;height:19px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:15px;line-height:1;flex:none}
-  .btn.alt{background:var(--hair);color:var(--text)}
-  .btn.alt svg{width:17px;height:17px;flex:none}
-  .card.notes .btn{background:var(--green-soft);color:var(--green)}
-  .card.notes .btn .ic{background:var(--green)}
-  .notelines p{font-size:16px;padding:8px 0;border-top:1px solid var(--hair)}
-  .notelines p:first-child{border-top:0;padding-top:4px}
+  /* gmail-style rows */
+  .row{display:flex;gap:14px;padding:11px 16px 11px 14px;align-items:flex-start;min-height:72px}
+  .row + .row{border-top:1px solid var(--hair)}
+  .av{width:40px;height:40px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:17px;font-weight:600;margin-top:2px}
+  .av svg{width:18px;height:18px;display:none}
+  .done .av{background:var(--green)!important}
+  .done .av svg{display:block}
+  .done .av i{display:none}
+  .av i{font-style:normal}
+  .c1{background:#7B61FF}.c2{background:#E8710A}.c3{background:#1A73E8}.c4{background:#0B8043}.c5{background:#C5221F}.c6{background:#5F6368}
+  .body{flex:1;min-width:0}
+  .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .t .name{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .done .t .name{font-weight:500;color:var(--muted)}
+  .t .when{font-size:12px;color:var(--muted);flex:none}
+  .done .t .when{color:var(--green);font-weight:600}
+  .p1{font-size:15px;color:var(--text);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p2{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p2 .star{color:#F4B400;margin-right:3px}
+  .row.open .p1,.row.open .p2{white-space:normal}
+  .exp{display:none;padding:0 16px 14px 68px;border-top:0}
+  .row.open + .exp{display:block}
+  .exp .field{display:flex;align-items:center;gap:10px;background:var(--bar);border-radius:24px;padding:8px 8px 8px 16px;font-size:16px;min-height:48px;margin-top:4px}
+  .exp .field span{flex:1;color:var(--faint)}
+  .exp .save{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;flex:none}
+  .exp .save svg{width:15px;height:15px}
+  .exp .lab{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 4px}
+  .exp p{font-size:15px}
+  .exp .h{display:flex;gap:12px;font-size:15px;padding:4px 0}
+  .exp .h span:first-child{color:var(--muted);width:56px;flex:none;font-size:13px;padding-top:2px}
 
-  /* journal */
-  .jd{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 6px 8px}
-  .jl{padding:9px 0;border-top:1px solid var(--hair)}
-  .jl:first-of-type{border-top:0}
-  .card h3 + .jl{border-top:0;margin-top:6px}
-  .jn{font-weight:500;font-size:17px}
-  .jt{color:var(--muted);font-size:15px;margin-top:1px}
-  .jl.skip .jn{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+  /* notes row */
+  .row.note .av{background:var(--bar);color:var(--muted)}
 
-  /* exercises */
-  .search{background:var(--card);border-radius:14px;padding:12px 16px;color:var(--text);font-size:17px;margin-bottom:12px;border:0;width:100%;font-family:inherit}
-  .search::placeholder{color:var(--faint)}
-  .card.list{padding:4px 16px}
-  .card.list .ln:first-child{border-top:0}
-  .card.list .ln{min-height:50px}
-  .rx .cn{color:var(--text);display:block;margin:4px 0 6px}
 
-  /* PRs */
-  .pr{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px}
-  .pr h3{font-size:19px;font-weight:700}
-  .pr .big{font-size:34px;font-weight:700;letter-spacing:-.02em;margin-top:4px}
-  .pr .big small{font-size:14px;font-weight:600;color:var(--green);margin-left:8px}
-  .pr .big small.dn{color:var(--red)}
-  .pr .meta{color:var(--muted);font-size:14px;margin-top:2px}
-  .spark{display:flex;align-items:flex-end;gap:5px;height:44px;margin-top:12px}
-  .spark i{flex:1;background:var(--faint);border-radius:3px 3px 0 0}
-  .spark i:last-child{background:var(--red)}
 
-  /* races */
-  .rc{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair);min-height:44px}
-  .rc:first-of-type{border-top:0}
-  .rc .i{flex:1;min-width:0}
-  .rc .nm{font-size:18px;font-weight:500}
-  .rc .mt{color:var(--muted);font-size:15px;margin-top:1px}
-  .rc .mt.sm{font-size:14px;color:var(--faint)}
-  .rc.past .nm{color:var(--muted)}
-  .pill{flex:none;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 9px;border-radius:8px}
-  .pill.go{background:var(--red-soft);color:var(--red)}
-  .pill.maybe{background:var(--hair);color:var(--muted)}
-  .pill.done{background:var(--green-soft);color:var(--green)}
 
-  /* sheet */
-  .shade{position:absolute;inset:0;background:rgba(0,0,0,.35)}
-  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:22px 22px 0 0;padding:12px 20px calc(env(safe-area-inset-bottom) + 20px);max-height:80%;overflow-y:auto}
-  .sheet .grab{width:38px;height:5px;border-radius:3px;background:var(--faint);margin:0 auto 14px}
-  .sheet h3{font-size:20px;font-weight:700}
-  .sheet .sub{color:var(--muted);font-size:14px;margin-bottom:8px}
-  .fld{padding:12px 0;border-top:1px solid var(--hair)}
-  .fld .fn{font-weight:600;font-size:16px}
-  .fld .rx{display:block;padding:0;font-size:14px;margin-top:1px}
-  .fld .in{margin-top:8px;background:var(--bg);border-radius:12px;padding:11px 14px;font-size:17px;min-height:46px;border:0;width:100%;font-family:inherit;color:var(--text);display:block}
-  .fld .in::placeholder{color:var(--faint)}
-  .sheet .go{margin-top:14px;background:var(--red);color:#fff;font-weight:700;font-size:17px;text-align:center;border-radius:14px;padding:15px;border:0;width:100%;font-family:inherit}
 
-  /* tabs */
-  .tabs{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--hair);display:flex;padding:8px 0 calc(env(safe-area-inset-bottom) + 6px)}
-  .tabs button{flex:1;border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
-  .tabs button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8}
-  .tabs button.on{color:var(--red)}
+  .ready{display:flex;align-items:center;gap:10px;padding:2px 16px 8px}
+  .ready .rl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+  .rc{width:22px;height:22px;border-radius:50%;border:2px solid transparent;opacity:.45}
+  .rc.g{background:var(--green)}.rc.y{background:#F9AB00}.rc.r{background:var(--red)}
+  .rc.on{opacity:1;box-shadow:0 0 0 2px var(--bg),0 0 0 4px currentColor}
+  .rc.g.on{color:var(--green)}.rc.y.on{color:#F9AB00}.rc.r.on{color:var(--red)}
+  .ready .rt{font-size:13px;color:var(--muted);margin-left:2px}
+  /* undo toast */
+  .toast{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 84px);background:#323232;color:#fff;border-radius:8px;padding:12px 16px;font-size:15px;display:none;justify-content:space-between;align-items:center;z-index:15;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .toast.on{display:flex}
+  .toast b{color:#8AB4F8;font-weight:600}
+  /* pain / rpe chips */
+  .pr{display:flex;gap:14px;margin:10px 0 4px;flex-wrap:wrap}
+  .pr .grp{display:flex;align-items:center;gap:6px}
+  .pr .grp small{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-right:2px}
+  .pr .ch{width:30px;height:30px;border-radius:50%;border:1px solid var(--hair);display:grid;place-items:center;font-size:13px;font-weight:500}
+  .pr .ch.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .pr .ch.on.amber{background:#F9AB00;border-color:#F9AB00}
 
-  /* setup / status */
-  .setup{padding:40px 24px;color:var(--text)}
-  .setup h1{font-size:24px;font-weight:700;margin-bottom:6px}
+
+  .rdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .rdot.g{background:var(--green)}.rdot.y{background:#F9AB00}.rdot.r{background:var(--red)}
+  #list .row.note{border-top:0;margin-top:0;border-bottom:1px solid var(--hair);background:var(--bar)}
+  .nl{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}
+  .nl span{color:var(--muted);font-size:13px;width:60px;flex:none;padding-top:2px;font-weight:600}
+  .nl p{font-size:16px;line-height:1.45}
+  #np .ready{padding:0 0 4px}
+
+  /* swipe + drag */
+  .sw{position:relative;overflow:hidden;border-top:1px solid var(--hair)}
+  .sw:first-child{border-top:0}
+  .sw .row{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y}
+  .sw .del{position:absolute;right:0;top:0;bottom:0;width:96px;background:var(--red);color:#fff;font-weight:600;display:grid;place-items:center;font-size:15px}
+  .row + .row{border-top:0}
+  .hdl{width:28px;align-self:stretch;display:grid;place-items:center;color:var(--faint);flex:none;margin:-11px -6px -11px 0;touch-action:none;cursor:grab}
+  .hdl svg{width:18px;height:18px;fill:currentColor}
+  .sw.lift .row{box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:5}
+  .sw.gap-top{border-top:2px solid var(--blue)}
+  .sw.gap-bot{border-bottom:2px solid var(--blue)}
+  #list{padding-top:2px}
+  #list .row.note{border-top:1px solid var(--hair);margin-top:6px}
+  /* add sheet */
+  .shade{display:none;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:20}
+  .sheet{display:none;position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom) + 16px);z-index:21;max-height:78%;overflow-y:auto}
+  .open-add .shade,.open-add .sheet{display:block}
+  .grab{width:38px;height:5px;border-radius:3px;background:var(--faint);margin:0 auto 12px}
+  .shead{font-size:18px;font-weight:600;margin-bottom:10px}
+  .opt{display:flex;align-items:center;gap:14px;padding:11px 4px;border-top:1px solid var(--hair)}
+  .opt .av{margin:0;width:36px;height:36px;font-size:15px}
+  .opt .ob{flex:1;min-width:0}
+  .opt b{display:block;font-size:16px;font-weight:600}
+  .opt small{display:block;font-size:13px;color:var(--muted)}
+  .opt .plus{width:32px;height:32px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:20px}
+  .opt.new .av{background:var(--bar);color:var(--muted)}
+  .scope{display:flex;background:var(--bar);border-radius:12px;padding:3px;margin-top:14px}
+  .scope span{flex:1;text-align:center;font-size:14px;font-weight:500;padding:8px 0;border-radius:9px;color:var(--muted)}
+  .scope span.on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  /* search */
+  .sbar{padding:4px 6px 4px 4px;gap:6px}
+  .sbar .back{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--text)}
+  .sbar .back svg{width:22px;height:22px}
+  .sin{flex:1;border:0;background:transparent;font:inherit;font-size:17px;color:var(--text);outline:none;min-width:0}
+  .clr{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:22px;flex:none}
+  .weeks{display:flex;gap:8px;padding:10px 16px 4px;overflow-x:auto;scrollbar-width:none}
+  .weeks::-webkit-scrollbar{display:none}
+  .wk{flex:none;font-size:13px;font-weight:500;border:1px solid var(--hair);border-radius:16px;padding:6px 12px;color:var(--text)}
+  .wk.on{background:var(--blue-soft);border-color:var(--blue-soft);color:var(--blue)}
+  .smode{display:none}.smode.on{display:block}
+  .jday{font-size:13px;font-weight:600;color:var(--muted);padding:16px 16px 4px;letter-spacing:.02em}
+  #sp .row{min-height:64px}
+  #sp .pgscroll{padding:0 0 calc(env(safe-area-inset-bottom) + 24px)}
+
+  /* exercise page */
+  .pg{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
+  .pg.on{display:flex;transform:translateX(0)}
+  .pgtop{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 12px 8px}
+  .pgtop .back,.pgtop .ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--text)}
+  .pgtop .back svg,.pgtop .ic svg{width:24px;height:24px}
+  .pgtop .pos{font-size:14px;color:var(--muted);font-weight:500}
+  .pgacts{display:flex}
+  .pgscroll{flex:1;overflow-y:auto;padding:4px 16px calc(env(safe-area-inset-bottom) + 100px)}
+  .pghead{display:flex;gap:14px;align-items:center;padding:8px 0 16px}
+  .pgname{font-size:22px;font-weight:600;line-height:1.2}
+  .pgsub{font-size:14px;color:var(--muted);margin-top:2px}
+  .pgfield{display:flex;align-items:center;gap:10px;background:var(--bar);border-radius:26px;padding:8px 8px 8px 18px;font-size:17px;min-height:52px}
+  .pgfield .ph{flex:1;color:var(--faint)}
+  .pgfield .save{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;flex:none}
+  .pgfield .save svg{width:16px;height:16px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+  .chips span{font-size:13px;font-weight:500;border:1px solid var(--hair);border-radius:16px;padding:6px 12px;color:var(--text);background:var(--bg)}
+  .sec{padding:16px 0 4px;border-top:1px solid var(--hair);margin-top:12px}
+  .sec .lab{padding:0 0 6px}
+  .sec p{font-size:16px;line-height:1.5}
+  .sec p + p{margin-top:8px}
+  .sec .rule{color:var(--muted);font-size:15px}
+  .sec .h{display:flex;gap:12px;font-size:16px;padding:7px 0;border-bottom:1px solid var(--hair)}
+  .sec .h span:first-child{color:var(--muted);width:60px;flex:none;font-size:13px;padding-top:3px;font-weight:600}
+  .sec .more{color:var(--blue);font-size:14px;font-weight:600;padding:12px 0 4px}
+  .pgnav{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--hair);display:flex;padding:8px 8px calc(env(safe-area-inset-bottom) + 10px);gap:8px}
+  .nb{flex:1;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:14px;min-width:0}
+  .nb.r{justify-content:flex-end;text-align:right}
+  .nb svg{width:20px;height:20px;color:var(--muted);flex:none}
+  .nb small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .nb b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nb div{min-width:0}
+
+  /* bottom bar */
+  .bot{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--hair);padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);display:flex;justify-content:space-between}
+  .bb{width:60px;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .bb .c{width:44px;height:44px;border-radius:50%;background:var(--bar);display:grid;place-items:center;color:var(--text);position:relative}
+  .bb .c svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+  .bb .c.add{background:var(--blue);color:#fff}
+  .bb .c .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:9px;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px}
+  .bb small{font-size:10px;color:var(--muted)}
+
+  /* ── app additions on top of the mockup stylesheet ── */
+  input,textarea,button{font-family:inherit}
+  .sin::placeholder,.pgfield input::placeholder,.exp .field input::placeholder{color:var(--faint)}
+  .pgfield input,.exp .field input{flex:1;border:0;background:transparent;font:inherit;color:var(--text);outline:none;min-width:0}
+  .dbtn{cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .dbtn.sel{box-shadow:inset 0 0 0 2px var(--sel)}
+  .dbtn.sel b{color:var(--sel)}
+  .toast .undo{background:none;border:0;color:#8AB4F8;font-weight:600;font-size:15px;padding:4px 6px}
+  .toast.err{background:var(--red);color:#fff}
+  .toast.err .undo{color:#fff;text-decoration:underline}
+  .boot{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:var(--muted);font-size:15px}
+  .setup{padding:44px 24px;color:var(--text)}
+  .setup h1{font-size:26px;font-weight:600;margin-bottom:6px}
   .setup p{color:var(--muted);font-size:15px;margin-bottom:18px}
-  .setup input{width:100%;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:13px 14px;font:inherit;font-size:16px;color:var(--text)}
-  .setup button{margin-top:12px;width:100%;background:var(--red);color:#fff;border:0;border-radius:12px;padding:15px;font:inherit;font-weight:700;font-size:17px}
+  .setup input{width:100%;background:var(--bar);border:0;border-radius:14px;padding:14px 16px;font:inherit;font-size:16px;color:var(--text)}
+  .setup button{margin-top:12px;width:100%;background:var(--blue);color:#fff;border:0;border-radius:14px;padding:15px;font:inherit;font-weight:600;font-size:17px}
   .setup .err{color:var(--red);font-size:14px;margin-top:10px}
-  .boot{display:grid;place-items:center;height:100%;color:var(--muted);font-size:15px;text-align:center;padding:24px}
 </style>
 </head>
 <body>
@@ -160,7 +229,7 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-/* ───────────────────────── config ───────────────────────── */
+/* ═══════════════════════ config ═══════════════════════ */
 
 const BASE = 'appmqPkBzBzcKlrce';
 const TBL = {
@@ -171,37 +240,52 @@ const TBL = {
   dayNotes : 'tblxTF4kmjHnGv4fx',
 };
 
-// Benchmark exercises shown on the PRs tab. Names must match Exercises.Name exactly.
-const BENCHMARKS = [
-  'Trap Bar Deadlift',
-  'Power Clean',
-  'GHD Sorenson Hold',
-  'Weighted Step-Down Negatives',
-];
+const LS_PAT    = 'ledger.pat';
+const LS_THEME  = 'ledger.theme';
+const LS_COLORS = 'ledger.blockColors';
 
-const LS_PAT = 'ledger.pat';
-const LS_THEME = 'ledger.theme';
-const STALE_MS = 60 * 60 * 1000;   // refresh Schedule on foreground after 1 hr
+const STALE_MS   = 60 * 60 * 1000;   // refetch Schedule on foreground after an hour
+const SEARCH_MAX = 2000;             // stop the Logs sweep at 2000 rows …
+const SEARCH_MONTHS = 12;            // … or 12 months back, whichever comes first
 
-/* ───────────────────────── dates ───────────────────────── */
+// Avatar palette from the mockup, used for Blocks in order of first appearance.
+const AV_PALETTE = ['#7B61FF', '#E8710A', '#1A73E8', '#0B8043', '#C5221F', '#5F6368'];
 
-const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+// Sections have fixed colours; Recovery's teal is not in the mockup palette.
+const SECTION_AV = {
+  'Warm-Up':      { letter: 'W', color: '#5F6368' },
+  'Main Session': { letter: 'M', color: '#0B8043' },
+  'Finisher':     { letter: 'F', color: '#C5221F' },
+  'Recovery':     { letter: 'R', color: '#00897B' },
+};
+
+/* ═══════════════════════ dates ═══════════════════════ */
+
+const DOW  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const parseISO = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
-const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-const todayISO = () => iso(new Date());
-const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate()+n); return iso(d); };
-const dowName = s => DOW[parseISO(s).getDay()];
-const mondayOf = s => { const d = parseISO(s); const wd = d.getDay(); d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd)); return iso(d); };
-const weekDays = s => { const m = mondayOf(s); return Array.from({length:7}, (_,i) => addDays(m, i)); };
-const fmtLong = s => { const d = parseISO(s); return MON[d.getMonth()] + ' ' + d.getDate(); };
-const fmtShort = s => { const d = parseISO(s); return MON3[d.getMonth()] + ' ' + d.getDate(); };
-const fmtJournal = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON3[d.getMonth()] + ' ' + d.getDate(); };
-const daysUntil = s => Math.round((parseISO(s) - parseISO(todayISO())) / 86400000);
+const parseISO  = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const iso       = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const todayISO  = () => iso(new Date());
+const addDays   = (s, n) => { const d = parseISO(s); d.setDate(d.getDate()+n); return iso(d); };
+const dowName   = s => DOW[parseISO(s).getDay()];
+const weekStartOf = s => { const d = parseISO(s); const wd = d.getDay(); d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd)); return iso(d); };
+const weekDays  = s => { const m = weekStartOf(s); return Array.from({length:7}, (_,i) => addDays(m, i)); };
+const nextMonday = s => addDays(weekStartOf(s), 7);
 
-/* ───────────────────────── Airtable REST ───────────────────────── */
+const fmtFull   = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); };
+const fmtShort  = s => { const d = parseISO(s); return MON3[d.getMonth()] + ' ' + d.getDate(); };
+const fmtDayShort = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON3[d.getMonth()] + ' ' + d.getDate(); };
+const daysUntil = s => Math.round((parseISO(s) - parseISO(todayISO())) / 86400000);
+const weekLabel = ws => {
+  const end = addDays(ws, 6), a = parseISO(ws), b = parseISO(end);
+  return a.getMonth() === b.getMonth()
+    ? MON3[a.getMonth()] + ' ' + a.getDate() + '–' + b.getDate()
+    : fmtShort(ws) + '–' + fmtShort(end);
+};
+
+/* ═══════════════════════ Airtable REST ═══════════════════════ */
 
 class AuthError extends Error {}
 
@@ -209,6 +293,7 @@ let PAT = localStorage.getItem(LS_PAT) || '';
 const setPat = v => { PAT = v; v ? localStorage.setItem(LS_PAT, v) : localStorage.removeItem(LS_PAT); };
 
 const qs = pairs => pairs.map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+const esc = s => String(s).replace(/"/g, '\\"');
 
 async function at(table, { method = 'GET', params = [], body } = {}) {
   const url = 'https://api.airtable.com/v0/' + BASE + '/' + table + (params.length ? '?' + qs(params) : '');
@@ -219,34 +304,55 @@ async function at(table, { method = 'GET', params = [], body } = {}) {
   });
   if (res.status === 401 || res.status === 403) { setPat(''); throw new AuthError('Airtable rejected the token'); }
   if (!res.ok) throw new Error('Airtable ' + res.status + ': ' + (await res.text()).slice(0, 200));
-  return res.json();
+  return res.status === 204 ? {} : res.json();
 }
 
 async function atAll(table, params = []) {
   const out = [];
   let offset;
   do {
-    const p = offset ? params.concat([['offset', offset]]) : params;
-    const j = await at(table, { params: p });
+    const j = await at(table, { params: offset ? params.concat([['offset', offset]]) : params });
     out.push(...j.records);
     offset = j.offset;
   } while (offset);
   return out;
 }
 
-// One page, for the Journal's infinite scroll.
 async function atPage(table, params, offset) {
   const j = await at(table, { params: offset ? params.concat([['offset', offset]]) : params });
   return { records: j.records, offset: j.offset };
 }
 
-const esc = s => String(s).replace(/"/g, '\\"');
+// Airtable caps writes at 10 records per request.
+const chunk10 = arr => { const out = []; for (let i = 0; i < arr.length; i += 10) out.push(arr.slice(i, i+10)); return out; };
 
-/* ───────────────────────── shaping ───────────────────────── */
+async function createMany(table, fieldsList) {
+  const made = [];
+  for (const batch of chunk10(fieldsList)) {
+    const j = await at(table, { method: 'POST', body: { records: batch.map(fields => ({ fields })), typecast: false } });
+    made.push(...j.records);
+  }
+  return made;
+}
+async function updateMany(table, records) {
+  const done = [];
+  for (const batch of chunk10(records)) {
+    const j = await at(table, { method: 'PATCH', body: { records: batch } });
+    done.push(...j.records);
+  }
+  return done;
+}
+async function deleteMany(table, ids) {
+  for (const batch of chunk10(ids)) {
+    await at(table, { method: 'DELETE', params: batch.map(id => ['records[]', id]) });
+  }
+}
+
+/* ═══════════════════════ shaping ═══════════════════════ */
 
 const shapeExercise = r => ({ id: r.id, name: r.fields['Name'] || '', notes: r.fields['Coaching Notes'] || '' });
 
-const shapeScheduleRow = r => ({
+const shapeRow = r => ({
   id: r.id,
   dow: r.fields['Day of Week'] || '',
   order: r.fields['Order'] == null ? 1e9 : r.fields['Order'],
@@ -257,696 +363,184 @@ const shapeScheduleRow = r => ({
   prescription: r.fields['Prescription'] || '',
 });
 
-const shapeLog = r => ({
-  id: r.id,
-  exerciseId: (r.fields['Exercise'] || [])[0] || '',
-  date: r.fields['Log Date'] || '',
-  text: r.fields['Log Text'] || '',
-});
+// The write shape of a Schedule row, used for copy-on-write and Undo.
+const rowFields = (r, weekOf) => {
+  const f = {
+    'Day of Week': r.dow,
+    'Order': r.order,
+    'Exercise': r.exercises,
+  };
+  if (weekOf !== undefined) { if (weekOf) f['Week Of'] = weekOf; }
+  else if (r.weekOf) f['Week Of'] = r.weekOf;
+  if (r.section) f['Section'] = r.section;
+  if (r.block) f['Block'] = r.block;
+  if (r.prescription) f['Prescription'] = r.prescription;
+  return f;
+};
 
-const shapeRace = r => ({
-  id: r.id,
-  name: r.fields['Name'] || '',
-  date: r.fields['Date'] || '',
-  status: r.fields['Status'] || '',
-  place: r.fields['City/State'] || '',
-  miles: r.fields['Miles'] || null,
-  type: r.fields['Race Type'] || '',
-});
-
+const shapeLog  = r => ({ id: r.id, exerciseId: (r.fields['Exercise'] || [])[0] || '', date: r.fields['Log Date'] || '', text: r.fields['Log Text'] || '' });
+const shapeRace = r => ({ id: r.id, name: r.fields['Name'] || '', date: r.fields['Date'] || '', status: r.fields['Status'] || '', place: r.fields['City/State'] || '', miles: r.fields['Miles'] || null });
 const shapeNote = r => ({ id: r.id, date: r.fields['Date'] || '', notes: r.fields['Notes'] || '' });
 
-/* ───────────────────────── schedule resolution ───────────────────────── */
+/* ═══════════════════════ log text: pain / RPE ═══════════════════════ */
 
-// For a date, pick the week's rows: a custom week (Week Of = that Monday) fully
-// replaces the template (Week Of blank). Then filter to the day and sort by Order.
-function rowsForDate(schedule, dateISO) {
-  const monday = mondayOf(dateISO);
-  const custom = schedule.filter(r => r.weekOf === monday);
-  const pool = custom.length ? custom : schedule.filter(r => !r.weekOf);
-  const dow = dowName(dateISO);
-  return pool.filter(r => r.dow === dow).sort((a, b) => a.order - b.order);
-}
-
-// Group a day's rows into cards by Block, falling back to Section. One line per
-// linked exercise. Card order follows the lowest Order inside the card.
-function buildCards(rows, exById) {
-  const byKey = new Map();
-  for (const r of rows) {
-    const key = r.block || r.section || 'Other';
-    if (!byKey.has(key)) byKey.set(key, { name: key, groupedBy: r.block ? 'Block' : 'Section', minOrder: r.order, rows: [] });
-    const c = byKey.get(key);
-    if (r.order < c.minOrder) c.minOrder = r.order;
-    c.rows.push(r);
+// Trailing " · pain N" and " · RPE N" are split off for display and search.
+function splitResult(text) {
+  let body = String(text || ''), pain = null, rpe = null, m;
+  for (;;) {
+    if ((m = body.match(/\s*·\s*RPE\s*(\d+)\s*$/i)))      { rpe  = +m[1]; body = body.slice(0, m.index); continue; }
+    if ((m = body.match(/\s*·\s*pain\s*(\d+)\s*$/i)))     { pain = +m[1]; body = body.slice(0, m.index); continue; }
+    break;
   }
-  const cards = [...byKey.values()];
-  for (const c of cards) {
-    // A leading row whose single linked exercise is named after the block is a
-    // description row: its Prescription becomes the card's prose, and it is not
-    // rendered as a line of its own.
-    const first = c.rows[0];
-    const firstNames = first.exercises.map(id => (exById[id] || {}).name);
-    if (firstNames.length === 1 && firstNames[0] === c.name && first.prescription) {
-      c.description = first.prescription;
-      c.rows = c.rows.slice(1);
-    }
-    c.lines = [];
-    for (const r of c.rows) {
-      for (const id of r.exercises) {
-        c.lines.push({
-          key: r.id + ':' + id,
-          rowId: r.id,
-          exerciseId: id,
-          name: (exById[id] || {}).name || '(unknown exercise)',
-          prescription: r.prescription,
-        });
-      }
-    }
-  }
-  cards.sort((a, b) => a.minOrder - b.minOrder);
-  return cards;
+  return { body: body.trim(), pain, rpe };
 }
-
-/* ───────────────────────── writes ───────────────────────── */
-
-const createLog = (exerciseId, date, text) =>
-  at(TBL.logs, { method: 'POST', body: { records: [{ fields: { 'Exercise': [exerciseId], 'Log Date': date, 'Log Text': text } }] } });
-const updateLog = (id, text) =>
-  at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields: { 'Log Text': text } }] } });
-const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
-
-const createNote = (date, notes) =>
-  at(TBL.dayNotes, { method: 'POST', body: { records: [{ fields: { 'Date': date, 'Notes': notes } }] } });
-const updateNote = (id, notes) =>
-  at(TBL.dayNotes, { method: 'PATCH', body: { records: [{ id, fields: { 'Notes': notes } }] } });
-
-// Every write gets exactly one retry; after that the caller surfaces a Retry link.
-const attempt = async fn => {
-  try { return await fn(); }
-  catch (e) { if (e instanceof AuthError) throw e; return fn(); }
-};
-
-/* ───────────────────────── debug helper ───────────────────────── */
-
-// window.LEDGER.day('2026-09-21') prints the resolved cards for any date.
-function dumpDay(label, dateISO, schedule, exById, logs) {
-  const rows = rowsForDate(schedule, dateISO);
-  const cards = buildCards(rows, exById);
-  const custom = schedule.some(r => r.weekOf === mondayOf(dateISO));
-  const doneIds = new Set((logs || []).map(l => l.exerciseId));
-  console.group('%c' + label + ' — ' + dateISO + ' (' + dowName(dateISO) + ')', 'font-weight:700;color:#E5484D');
-  console.log('week of ' + mondayOf(dateISO) + ' · ' + (custom ? 'CUSTOM week rows' : 'template rows') +
-              ' · ' + rows.length + ' schedule rows → ' + cards.length + ' cards');
-  for (const c of cards) {
-    const done = c.lines.filter(l => doneIds.has(l.exerciseId)).length;
-    console.group('%c' + c.name + '  ' + done + ' / ' + c.lines.length +
-                  '%c   [by ' + c.groupedBy + ', order ' + c.minOrder + ']',
-                  'font-weight:700', 'color:#9A9AA0;font-weight:400');
-    if (c.description) console.log('%cdesc:%c ' + c.description, 'color:#9A9AA0', '');
-    console.table(c.lines.map(l => ({ '✓': doneIds.has(l.exerciseId) ? '✓' : '', exercise: l.name, prescription: l.prescription })));
-    console.groupEnd();
-  }
-  console.groupEnd();
-  return cards;
-}
-
-/* ───────────────────────── icons ───────────────────────── */
-
-const IconCal   = () => <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>;
-const IconCheck = () => <svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-6" fill="none" stroke="currentColor" strokeWidth="2.2"/></svg>;
-const IconChev  = () => <svg className="chev" viewBox="0 0 12 12"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8"/></svg>;
-const IconClock = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
-const IconWeek  = () => <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>;
-const IconJour  = () => <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>;
-const IconBolt  = () => <svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>;
-const IconPlus  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>;
-const IconFlag  = () => <svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>;
-const IconBar   = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg>;
-
-const fmtSheetDate = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); };
-
-/* ───────────────────────── sheets ───────────────────────── */
-
-function Sheet({ title, sub, children, onClose, action, onAction, disabled }) {
-  return (
-    <React.Fragment>
-      <div className="shade" onClick={onClose} />
-      <div className="sheet">
-        <div className="grab" onClick={onClose} />
-        <h3>{title}</h3>
-        {sub && <div className="sub">{sub}</div>}
-        {children}
-        {action && (
-          <button className="go" onClick={onAction} disabled={disabled} style={disabled ? { opacity: .45 } : null}>
-            {action}
-          </button>
-        )}
-      </div>
-    </React.Fragment>
-  );
-}
-
-const uniqueLines = card => {
-  const out = [], seen = new Set();
-  card.lines.forEach(l => { if (!seen.has(l.exerciseId)) { seen.add(l.exerciseId); out.push(l); } });
-  return out;
-};
-
-function LogSheet({ card, date, logsByEx, onSave, onClose }) {
-  const lines = useMemo(() => uniqueLines(card), [card]);
-  const [vals, setVals] = useState(() =>
-    Object.fromEntries(lines.map(l => [l.exerciseId, (logsByEx[l.exerciseId] || {}).text || ''])));
-  const n = lines.filter(l => (vals[l.exerciseId] || '').trim()).length;
-  return (
-    <Sheet title={'Log Result — ' + card.name} sub={fmtSheetDate(date)} onClose={onClose}
-           action={'Save ' + n + ' result' + (n === 1 ? '' : 's')} onAction={() => onSave(vals)} disabled={n === 0}>
-      {lines.map(l => (
-        <div className="fld" key={l.exerciseId}>
-          <div className="fn">{l.name}</div>
-          {l.prescription && <div className="rx">{l.prescription}</div>}
-          <input className="in" value={vals[l.exerciseId]} placeholder="Result…"
-                 onChange={e => setVals(v => ({ ...v, [l.exerciseId]: e.target.value }))} />
-        </div>
-      ))}
-    </Sheet>
-  );
-}
-
-function HistorySheet({ card, onClose }) {
-  const [rows, setRows] = useState(null);
-  useEffect(() => {
-    let live = true;
-    Promise.all(uniqueLines(card).map(l =>
-      atAll(TBL.logs, [
-        ['filterByFormula', '{Exercise} = "' + esc(l.name) + '"'],
-        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', 5],
-      ]).then(rs => ({ line: l, logs: rs.map(shapeLog) })).catch(() => ({ line: l, logs: null }))
-    )).then(r => { if (live) setRows(r); });
-    return () => { live = false; };
-  }, [card]);
-  return (
-    <Sheet title={'History — ' + card.name} sub="Last 5 results" onClose={onClose}>
-      {rows === null && <div className="hist" style={{ borderTop: 0 }}>Loading…</div>}
-      {rows && rows.map(r => (
-        <div className="hist" key={r.line.exerciseId}>
-          <b>{r.line.name}</b>
-          {r.logs === null && <div>Could not load.</div>}
-          {r.logs && r.logs.length === 0 && <div style={{ color: 'var(--faint)' }}>No results yet</div>}
-          {r.logs && r.logs.map(l => <div key={l.id}>{l.date}. {l.text}</div>)}
-        </div>
-      ))}
-    </Sheet>
-  );
-}
-
-function NoteSheet({ date, onSave, onClose }) {
-  const [v, setV] = useState('');
-  return (
-    <Sheet title="Add Note" sub={fmtSheetDate(date)} onClose={onClose}
-           action="Save note" onAction={() => onSave(v)} disabled={!v.trim()}>
-      <div className="fld">
-        <input className="in" value={v} placeholder="Note…" autoFocus
-               onChange={e => setV(e.target.value)}
-               onKeyDown={e => { if (e.key === 'Enter' && v.trim()) onSave(v); }} />
-      </div>
-    </Sheet>
-  );
-}
-
-function ConfirmSheet({ line, text, onConfirm, onClose }) {
-  return (
-    <Sheet title="Remove this result?" sub={line.name} onClose={onClose}
-           action="Delete result" onAction={onConfirm}>
-      <div className="fld"><div className="rx" style={{ fontSize: 16, paddingBottom: 0 }}>{text}</div></div>
-    </Sheet>
-  );
-}
-
-/* ───────────────────────── header ───────────────────────── */
-
-function Header({ race, label, title, strip, onTheme, onDate }) {
-  const dateRef = useRef(null);
-  const openPicker = () => {
-    const el = dateRef.current;
-    if (!el) return;
-    if (el.showPicker) { try { el.showPicker(); return; } catch (e) {} }
-    el.click();
-  };
-  return (
-    <div className="hdr">
-      <div className="row1">
-        <div className="race">
-          {race ? <React.Fragment>⚑ <b>{race.name}</b> · {race.days} days</React.Fragment> : <span>&nbsp;</span>}
-        </div>
-        <div className="icons">
-          <span onClick={openPicker} role="button" aria-label="Pick a date"
-                style={{ display: 'grid', placeItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'end' }}>
-            <IconCal />
-          </span>
-          <input ref={dateRef} type="date" tabIndex={-1} aria-hidden="true"
-                 onChange={e => e.target.value && onDate(e.target.value)}
-                 style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }} />
-          <div className="tog" onClick={onTheme} role="button" aria-label="Toggle theme"><i /></div>
-        </div>
-      </div>
-      <div className="title">{label && <small>{label}</small>}{title}</div>
-      {strip}
-    </div>
-  );
-}
-
-function WeekStrip({ days, selected, today, dotDays, onPick }) {
-  return (
-    <div className="week">
-      {days.map(d => {
-        const cls = [d === today ? 'on' : '', d === selected ? 'sel' : ''].filter(Boolean).join(' ');
-        return (
-          <div key={d} className={cls} onClick={() => onPick(d)}>
-            <span>{DOW[parseISO(d).getDay()].slice(0, 3).toUpperCase()}</span>
-            <b>{parseISO(d).getDate()}</b>
-            {dotDays.has(d) && <div className="dot" />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ───────────────────────── week tab ───────────────────────── */
-
-function Line({ line, done, open, onOpen, onToggle, detail, retry }) {
-  return (
-    <React.Fragment>
-      <div className={'ln' + (done ? ' done' : '') + (open ? ' open' : '')} onClick={onOpen}>
-        <div className="cb" onClick={e => { e.stopPropagation(); onToggle(); }}><IconCheck /></div>
-        <div className="n">{line.name}</div>
-        {retry && <span className="retry" onClick={e => { e.stopPropagation(); retry(); }}>Retry</span>}
-        <IconChev />
-      </div>
-      {open && (
-        <div className="rx">
-          {line.prescription && <b>{line.prescription}</b>}
-          {detail === null && <React.Fragment>{line.prescription && <br />}<span style={{ opacity: .6 }}>Loading history…</span></React.Fragment>}
-          {detail && detail.current && <React.Fragment>{line.prescription && <br />}{detail.currentDate}. {detail.current}</React.Fragment>}
-          {detail && detail.previous.map((p, i) => (
-            <React.Fragment key={p.id}>{(line.prescription || detail.current || i > 0) && <br />}{p.date}. {p.text}</React.Fragment>
-          ))}
-          {detail && !detail.current && !detail.previous.length && !line.prescription &&
-            <span style={{ opacity: .6 }}>No prescription or history</span>}
-        </div>
-      )}
-    </React.Fragment>
-  );
-}
-
-function BlockCard({ card, logsByEx, openKey, setOpenKey, detailFor, onToggle, onLogResult, onHistory, onAdd, failedFor }) {
-  const done = card.lines.filter(l => logsByEx[l.exerciseId]).length;
-  return (
-    <div className="card">
-      <h3>{card.name} <small>{done} / {card.lines.length}</small></h3>
-      {card.description && <div className="desc">{card.description}</div>}
-      <div className="lines">
-        {card.lines.map(l => (
-          <Line key={l.key} line={l} done={!!logsByEx[l.exerciseId]}
-                open={openKey === l.key}
-                onOpen={() => setOpenKey(openKey === l.key ? null : l.key)}
-                onToggle={() => onToggle(l)}
-                retry={failedFor(l)}
-                detail={openKey === l.key ? detailFor(l) : undefined} />
-        ))}
-      </div>
-      <div className="btns">
-        <button className="btn" onClick={() => onLogResult(card)}><span className="ic">+</span>Log Result</button>
-        <button className="btn alt" onClick={() => onHistory(card)}><IconClock />History</button>
-        <button className="btn alt" onClick={onAdd}><IconPlus />Add</button>
-      </div>
-    </div>
-  );
-}
-
-function NotesCard({ note, onAdd, onDelete, retry }) {
-  const lines = (note && note.notes ? note.notes.split('\n') : []).map(s => s.trim()).filter(Boolean);
-  const [swiped, setSwiped] = useState(null);
-  const start = useRef(null);
-  return (
-    <div className="card notes">
-      <h3>Notes {retry && <small className="retry" onClick={retry} style={{ cursor: 'pointer' }}>Retry</small>}</h3>
-      <div className="notelines">
-        {lines.length === 0 && <p style={{ color: 'var(--faint)' }}>No notes yet</p>}
-        {lines.map((t, i) => (
-          <p key={i}
-             onTouchStart={e => { start.current = e.touches[0].clientX; }}
-             onTouchEnd={e => {
-               const dx = e.changedTouches[0].clientX - (start.current || 0);
-               if (dx < -60) setSwiped(i); else if (dx > 20) setSwiped(null);
-             }}
-             style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-            <span>{t}</span>
-            {swiped === i && (
-              <button onClick={() => { setSwiped(null); onDelete(i); }}
-                      style={{ border: 0, background: 'var(--red)', color: '#fff', borderRadius: 8, padding: '6px 12px', font: 'inherit', fontSize: 14, fontWeight: 600, flex: 'none' }}>
-                Delete
-              </button>
-            )}
-          </p>
-        ))}
-      </div>
-      <div className="btns"><button className="btn" onClick={onAdd}><span className="ic">+</span>Add Note</button></div>
-    </div>
-  );
-}
-
-/* ───────────────────────── journal ───────────────────────── */
+const joinResult = (body, pain, rpe) =>
+  body.trim() + (pain == null ? '' : ' · pain ' + pain) + (rpe == null ? '' : ' · RPE ' + rpe);
 
 const isSkipped = t => /^\s*skipped\b/i.test(String(t || ''));
+const isCompleted = t => String(t || '').trim() === 'Completed';
 
-function JournalTab({ data, days, logs, more, loading, onLoadMore, onOpenLine, ensureNote }) {
-  const byDate = useMemo(() => {
-    const m = new Map();
-    logs.forEach(l => { if (!l.date) return; if (!m.has(l.date)) m.set(l.date, []); m.get(l.date).push(l); });
-    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [logs]);
+/* ═══════════════════════ readiness ═══════════════════════ */
 
-  useEffect(() => { byDate.forEach(([d]) => ensureNote(d)); }, [byDate, ensureNote]);
+const READINESS = {
+  Green:  { key: 'g', line: 'Green — execute as written' },
+  Yellow: { key: 'y', line: 'Yellow — reduce intensity' },
+  Red:    { key: 'r', line: 'Red — replace the session' },
+};
 
-  return (
-    <React.Fragment>
-      {byDate.map(([date, dayLogs]) => {
-        const cards = buildCards(rowsForDate(data.schedule, date), data.exById);
-        const blockOf = {}, lineKeyOf = {};
-        cards.forEach(c => c.lines.forEach(l => {
-          if (!(l.exerciseId in blockOf)) { blockOf[l.exerciseId] = c.name; lineKeyOf[l.exerciseId] = l.key; }
-        }));
+// Readiness lives as a fixed first line of the day's Day Notes.
+function splitNotes(raw) {
+  const lines = String(raw || '').split('\n').map(s => s.trim()).filter(Boolean);
+  let readiness = null;
+  if (lines.length) {
+    const m = lines[0].match(/^Readiness:\s*(Green|Yellow|Red)\s*$/i);
+    if (m) {
+      readiness = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+      lines.shift();
+    }
+  }
+  return { readiness, lines };
+}
+const buildNotes = (readiness, lines) =>
+  (readiness ? ['Readiness: ' + readiness] : []).concat(lines).join('\n');
 
-        const groups = new Map(cards.map(c => [c.name, []]));
-        const unscheduled = [];
-        dayLogs.forEach(l => {
-          const b = blockOf[l.exerciseId];
-          if (b) groups.get(b).push(l); else unscheduled.push(l);
-        });
+/* ═══════════════════════ avatars ═══════════════════════ */
 
-        const shown = [...groups.entries()].filter(([, ls]) => ls.length);
-        if (unscheduled.length) shown.push(['Unscheduled', unscheduled]);
-        const note = (days[date] || {}).note;
+// "Block A" → A, "Sled Superset" → S, "Accessory" → A.
+const blockLetter = name => {
+  const m = String(name).match(/^Block\s+(\S)/i);
+  return (m ? m[1] : String(name).trim()[0] || '?').toUpperCase();
+};
 
-        return (
-          <React.Fragment key={date}>
-            <div className="jd">{fmtJournal(date)}</div>
-            {shown.map(([name, ls]) => (
-              <div className="card" key={name}>
-                <h3>{name}</h3>
-                {ls.map(l => (
-                  <div className={'jl' + (isSkipped(l.text) ? ' skip' : '')} key={l.id}
-                       onClick={() => onOpenLine(date, lineKeyOf[l.exerciseId])}>
-                    <div className="jn">{(data.exById[l.exerciseId] || {}).name || '(unknown exercise)'}</div>
-                    <div className="jt">{l.text}</div>
-                  </div>
-                ))}
-              </div>
-            ))}
-            {note && note.notes && note.notes.trim() && (
-              <div className="card notes">
-                <h3>Notes</h3>
-                <div className="notelines">
-                  {note.notes.split('\n').map(s => s.trim()).filter(Boolean).map((t, i) => <p key={i}>{t}</p>)}
-                </div>
-              </div>
-            )}
-          </React.Fragment>
-        );
-      })}
-      {loading && <div className="jd">Loading…</div>}
-      {!loading && more && <div className="jd" onClick={onLoadMore} style={{ color: 'var(--red)' }}>Load more</div>}
-      {!loading && !more && byDate.length > 0 && <div className="jd" style={{ color: 'var(--faint)' }}>End of log</div>}
-    </React.Fragment>
-  );
+// Block colours are handed out in order of first appearance and kept in
+// localStorage so a block keeps its colour between sessions.
+const loadBlockColors = () => { try { return JSON.parse(localStorage.getItem(LS_COLORS)) || {}; } catch (e) { return {}; } };
+let BLOCK_COLORS = loadBlockColors();
+
+function blockColor(name) {
+  if (BLOCK_COLORS[name]) return BLOCK_COLORS[name];
+  const used = new Set(Object.values(BLOCK_COLORS));
+  const free = AV_PALETTE.find(c => !used.has(c)) || AV_PALETTE[Object.keys(BLOCK_COLORS).length % AV_PALETTE.length];
+  BLOCK_COLORS = { ...BLOCK_COLORS, [name]: free };
+  try { localStorage.setItem(LS_COLORS, JSON.stringify(BLOCK_COLORS)); } catch (e) {}
+  return free;
 }
 
-/* ───────────────────────── exercises ───────────────────────── */
-
-function ExercisesTab({ data }) {
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState(null);
-  const [hist, setHist] = useState({});     // exerciseId -> { logs, limit, loading }
-
-  const scheduledIds = useMemo(() => {
-    const s = new Set();
-    data.schedule.forEach(r => r.exercises.forEach(id => s.add(id)));
-    return s;
-  }, [data.schedule]);
-
-  // The row a scheduled exercise shows in its dropdown: prefer one that has a
-  // prescription, otherwise the first row that links it.
-  const rowFor = useMemo(() => {
-    const m = {};
-    data.schedule.forEach(r => r.exercises.forEach(id => {
-      if (!m[id] || (!m[id].prescription && r.prescription)) m[id] = r;
-    }));
-    return m;
-  }, [data.schedule]);
-
-  const load = useCallback((ex, limit) => {
-    setHist(h => ({ ...h, [ex.id]: { ...(h[ex.id] || { logs: [] }), limit, loading: true } }));
-    atAll(TBL.logs, [
-      ['filterByFormula', '{Exercise} = "' + esc(ex.name) + '"'],
-      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', limit],
-    ]).then(rs => setHist(h => ({ ...h, [ex.id]: { logs: rs.map(shapeLog), limit, loading: false } })))
-      .catch(() => setHist(h => ({ ...h, [ex.id]: { logs: [], limit, loading: false } })));
-  }, []);
-
-  const toggle = ex => {
-    if (open === ex.id) return setOpen(null);
-    setOpen(ex.id);
-    if (!hist[ex.id]) load(ex, 3);
-  };
-
-  const needle = q.trim().toLowerCase();
-  const match = e => !needle || e.name.toLowerCase().includes(needle);
-  const sorted = [...data.exercises].sort((a, b) => a.name.localeCompare(b.name));
-  const scheduled = sorted.filter(e => scheduledIds.has(e.id) && match(e));
-  const archived = sorted.filter(e => !scheduledIds.has(e.id) && match(e));
-
-  const row = (ex, grey) => {
-    const h = hist[ex.id];
-    const r = rowFor[ex.id];
-    return (
-      <React.Fragment key={ex.id}>
-        <div className={'ln' + (open === ex.id ? ' open' : '')} onClick={() => toggle(ex)}>
-          <div className="n" style={grey ? { color: 'var(--muted)' } : null}>{ex.name}</div>
-          <IconChev />
-        </div>
-        {open === ex.id && (
-          <div className="rx">
-            {r && r.prescription && <div><b>{r.prescription}</b>{r.dow ? ' — ' + r.dow : ''}</div>}
-            {ex.notes && <span className="cn">{ex.notes}</span>}
-            <div>
-              {h && h.loading && <span style={{ opacity: .6 }}>Loading…</span>}
-              {h && !h.loading && h.logs.length === 0 && <span style={{ opacity: .6 }}>No results yet</span>}
-              {h && !h.loading && h.logs.map((l, i) => (
-                <React.Fragment key={l.id}>{i > 0 && <br />}{l.date}. {l.text}</React.Fragment>
-              ))}
-              {h && !h.loading && h.logs.length >= h.limit && h.limit < 10 && (
-                <div style={{ color: 'var(--red)', fontWeight: 600, marginTop: 2 }}
-                     onClick={e => { e.stopPropagation(); load(ex, 10); }}>Show more</div>
-              )}
-            </div>
-          </div>
-        )}
-      </React.Fragment>
-    );
-  };
-
-  return (
-    <React.Fragment>
-      <input className="search" value={q} placeholder="Search exercises" onChange={e => setQ(e.target.value)} />
-      {scheduled.length > 0 && <div className="card list">{scheduled.map(e => row(e, false))}</div>}
-      {archived.length > 0 && (
-        <React.Fragment>
-          <div className="jd" style={{ marginTop: 6 }}>Not scheduled</div>
-          <div className="card list">{archived.map(e => row(e, true))}</div>
-        </React.Fragment>
-      )}
-      {scheduled.length === 0 && archived.length === 0 && <div className="jd">No exercises match “{q}”.</div>}
-    </React.Fragment>
-  );
+// Avatar comes from Block when the row has one, otherwise from Section.
+function avatarFor(row) {
+  if (row.block) return { letter: blockLetter(row.block), color: blockColor(row.block), label: row.block };
+  const s = SECTION_AV[row.section];
+  if (s) return { letter: s.letter, color: s.color, label: row.section };
+  return { letter: (row.section || '?').trim()[0].toUpperCase(), color: '#5F6368', label: row.section };
 }
 
-/* ───────────────────────── PRs ───────────────────────── */
+const WEEKDAY_COLOR = {
+  Monday: '#0B8043', Tuesday: '#E8710A', Wednesday: '#1A73E8', Thursday: '#7B61FF',
+  Friday: '#C5221F', Saturday: '#00897B', Sunday: '#5F6368',
+};
+const dayAvatar = dow => ({ letter: (dow || '?')[0].toUpperCase(), color: WEEKDAY_COLOR[dow] || '#5F6368' });
 
-// Leading number or clock time from a Log Text, used for the trend bars.
-function parseVal(t) {
-  const s = String(t || '').trim();
-  let m = s.match(/^(\d+):(\d{2})(?::(\d{2}))?/);
-  if (m) return m[3] ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : (+m[1] * 60 + +m[2]);
-  m = s.match(/^(\d+(?:\.\d+)?)/);
-  return m ? +m[1] : null;
-}
-const looksLikeTime = t => /^\d+:\d{2}/.test(String(t || '').trim());
-const fmtSecs = n => { const s = Math.round(Math.abs(n)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+/* ═══════════════════════ week resolution ═══════════════════════ */
 
-function PRsTab({ data, onOpen }) {
-  const [rows, setRows] = useState(null);
-
-  useEffect(() => {
-    let live = true;
-    Promise.all(BENCHMARKS.map(name =>
-      atAll(TBL.logs, [
-        ['filterByFormula', '{Exercise} = "' + esc(name) + '"'],
-        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', 20],
-      ]).then(rs => ({ name, logs: rs.map(shapeLog) })).catch(() => ({ name, logs: null }))
-    )).then(r => { if (live) setRows(r); });
-    return () => { live = false; };
-  }, []);
-
-  const dayOf = useMemo(() => {
-    const m = {};
-    data.schedule.forEach(r => r.exercises.forEach(id => {
-      const n = (data.exById[id] || {}).name;
-      if (n && !m[n] && r.dow) m[n] = r.dow;
-    }));
-    return m;
-  }, [data]);
-
-  if (rows === null) return <div className="jd">Loading…</div>;
-
-  return (
-    <React.Fragment>
-      {rows.map(r => {
-        if (!r.logs || r.logs.length === 0) {
-          return (
-            <div className="pr" key={r.name}>
-              <h3>{r.name}</h3>
-              <div className="meta" style={{ marginTop: 6 }}>
-                {r.logs === null ? 'Could not load.' : 'No results logged yet.'}
-              </div>
-            </div>
-          );
-        }
-        const latest = r.logs[0];
-        const prev = r.logs[1];
-        const a = parseVal(latest.text), b = prev ? parseVal(prev.text) : null;
-        const diff = (a !== null && b !== null) ? a - b : null;
-        const time = looksLikeTime(latest.text);
-        const bars = r.logs.slice(0, 5).map(l => parseVal(l.text)).reverse().filter(v => v !== null);
-        const max = Math.max(...bars, 1);
-        return (
-          <div className="pr" key={r.name} onClick={() => onOpen(r)}>
-            <h3>{r.name}</h3>
-            <div className="big">
-              {latest.text}
-              {diff !== null && diff !== 0 &&
-                <small className={diff < 0 ? 'dn' : ''}>
-                  {diff > 0 ? '▲' : '▼'} {time ? fmtSecs(diff) : Math.abs(+diff.toFixed(2))}
-                </small>}
-            </div>
-            <div className="meta">{fmtShort(latest.date)}{dayOf[r.name] ? ' · ' + dayOf[r.name] : ''} · {r.logs.length} logged</div>
-            {bars.length > 1 && (
-              <div className="spark">{bars.map((v, i) => <i key={i} style={{ height: Math.max(8, Math.round(v / max * 100)) + '%' }} />)}</div>
-            )}
-          </div>
-        );
-      })}
-    </React.Fragment>
-  );
+// Rows whose Week Of matches the week's Monday are an overlay and replace the
+// template entirely; otherwise the template rows (blank Week Of) are the week.
+function weekRows(schedule, dateISO) {
+  const ws = weekStartOf(dateISO);
+  const overlay = schedule.filter(r => r.weekOf === ws);
+  return { weekStart: ws, isOverlay: overlay.length > 0, rows: overlay.length ? overlay : schedule.filter(r => !r.weekOf) };
 }
 
-function PRHistorySheet({ pr, onClose }) {
-  return (
-    <Sheet title={pr.name} sub={pr.logs.length + ' results'} onClose={onClose}>
-      {pr.logs.map(l => (
-        <div className="hist" key={l.id}>{l.date}. {l.text}</div>
-      ))}
-    </Sheet>
-  );
+function rowsForDate(schedule, dateISO) {
+  const { rows, isOverlay, weekStart } = weekRows(schedule, dateISO);
+  const dow = dowName(dateISO);
+  return { weekStart, isOverlay, rows: rows.filter(r => r.dow === dow).sort((a, b) => a.order - b.order) };
 }
 
-/* ───────────────────────── races ───────────────────────── */
-
-// Status carries the commitment: Registered is committed, Waitlist is still
-// only potential, Completed is done.
-const PILL = { 'Registered': 'go', 'Waitlist': 'maybe', 'Completed': 'done' };
-
-function RaceRow({ race, past }) {
-  const when = [race.date, !past && race.date >= todayISO() ? daysUntil(race.date) + ' days' : '']
-    .filter(Boolean).join(' · ');
-  const where = [race.place, race.miles ? race.miles + ' mi' : '', race.type].filter(Boolean).join(' · ');
-  return (
-    <div className={'rc' + (past ? ' past' : '')}>
-      <div className="i">
-        <div className="nm">{race.name}</div>
-        <div className="mt">{when}</div>
-        {where && <div className="mt sm">{where}</div>}
-      </div>
-      {race.status && <span className={'pill ' + (PILL[race.status] || 'maybe')}>{race.status}</span>}
-    </div>
-  );
+// One line per linked exercise; a row linking two exercises yields two lines.
+function linesForDate(schedule, dateISO, exById) {
+  const { rows, isOverlay, weekStart } = rowsForDate(schedule, dateISO);
+  const lines = [];
+  for (const r of rows) {
+    for (const exId of r.exercises) {
+      lines.push({
+        key: r.id + ':' + exId,
+        rowId: r.id,
+        exerciseId: exId,
+        name: (exById[exId] || {}).name || '(unknown exercise)',
+        prescription: r.prescription,
+        section: r.section,
+        block: r.block,
+        order: r.order,
+        av: avatarFor(r),
+      });
+    }
+  }
+  return { weekStart, isOverlay, lines };
 }
 
-function RacesTab({ data }) {
-  const today = todayISO();
-  const upcoming = data.races.filter(r => r.date && r.date >= today && r.status !== 'Completed')
-                             .sort((a, b) => a.date.localeCompare(b.date));
-  const past = data.races.filter(r => !r.date || r.date < today || r.status === 'Completed')
-                         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  return (
-    <React.Fragment>
-      {upcoming.length > 0 && (
-        <React.Fragment>
-          <div className="jd">On the calendar</div>
-          <div className="card">{upcoming.map(r => <RaceRow key={r.id} race={r} />)}</div>
-        </React.Fragment>
-      )}
-      {past.length > 0 && (
-        <React.Fragment>
-          <div className="jd" style={{ marginTop: 6 }}>Done</div>
-          <div className="card">{past.map(r => <RaceRow key={r.id} race={r} past />)}</div>
-        </React.Fragment>
-      )}
-      {data.races.length === 0 && <div className="jd">No races yet.</div>}
-    </React.Fragment>
-  );
+/* ═══════════════════════ copy-on-write materialization ═══════════════════════ */
+
+// The first edit to a template week copies every template row for that week
+// into Week Of = weekStart rows. Templates are never touched by this path.
+async function materializeWeek(schedule, weekStart) {
+  const already = schedule.filter(r => r.weekOf === weekStart);
+  if (already.length) return { created: [], rows: already, wasNeeded: false };
+
+  const template = schedule.filter(r => !r.weekOf);
+  const made = await createMany(TBL.schedule, template.map(r => rowFields(r, weekStart)));
+  return { created: made.map(shapeRow), rows: made.map(shapeRow), wasNeeded: true };
 }
 
-/* ───────────────────────── quick log ───────────────────────── */
-
-function QuickLogSheet({ data, date, onSave, onClose }) {
-  const [q, setQ] = useState('');
-  const [pick, setPick] = useState(null);
-  const [text, setText] = useState('');
-  const [when, setWhen] = useState(date);
-
-  const needle = q.trim().toLowerCase();
-  const matches = needle
-    ? data.exercises.filter(e => e.name.toLowerCase().includes(needle)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
-    : [];
-
-  return (
-    <Sheet title="Log an exercise" sub={fmtSheetDate(when)} onClose={onClose}
-           action="Save result" disabled={!pick || !text.trim()}
-           onAction={() => onSave(when, pick.id, text.trim())}>
-      <div className="fld">
-        <div className="fn">Exercise</div>
-        <input className="in" value={pick ? pick.name : q} placeholder="Search exercises"
-               onChange={e => { setPick(null); setQ(e.target.value); }} />
-        {!pick && matches.map(e => (
-          <div className="ln" key={e.id} onClick={() => { setPick(e); setQ(e.name); }}>
-            <div className="n">{e.name}</div>
-          </div>
-        ))}
-      </div>
-      <div className="fld">
-        <div className="fn">Result</div>
-        <input className="in" value={text} placeholder="Result…" onChange={e => setText(e.target.value)} />
-      </div>
-      <div className="fld">
-        <div className="fn">Date</div>
-        <input className="in" type="date" value={when} onChange={e => e.target.value && setWhen(e.target.value)} />
-      </div>
-    </Sheet>
-  );
+// Copy a week's resolved rows forward into another week's overlay.
+async function copyWeekInto(schedule, fromDate, targetWeekStart) {
+  const existing = schedule.filter(r => r.weekOf === targetWeekStart);
+  if (existing.length) return { created: [], alreadyThere: true };
+  const { rows } = weekRows(schedule, fromDate);
+  const made = await createMany(TBL.schedule, rows.map(r => rowFields(r, targetWeekStart)));
+  return { created: made.map(shapeRow), alreadyThere: false };
 }
 
-/* ───────────────────────── app ───────────────────────── */
+/* ═══════════════════════ console dump (step 1) ═══════════════════════ */
+
+function dumpDay(label, dateISO, schedule, exById, logs) {
+  const { lines, isOverlay, weekStart } = linesForDate(schedule, dateISO, exById);
+  const done = new Set((logs || []).map(l => l.exerciseId));
+  console.group('%c' + label + ' — ' + fmtFull(dateISO) + ' (' + dateISO + ')', 'font-weight:700;color:#D93025');
+  console.log('week of ' + weekStart + ' · ' + (isOverlay ? 'OVERLAY rows (Week Of set)' : 'template rows (Week Of blank)') +
+              ' · ' + lines.length + ' lines');
+  console.table(lines.map(l => ({
+    '✓': done.has(l.exerciseId) ? '✓' : '',
+    av: l.av.letter,
+    exercise: l.name,
+    'block/section': l.block || l.section,
+    order: l.order,
+    prescription: l.prescription,
+  })));
+  console.groupEnd();
+  return lines;
+}
+
+/* ═══════════════════════ boot (step 1: data layer only) ═══════════════════════ */
 
 function Setup({ onDone }) {
   const [v, setV] = useState('');
@@ -957,10 +551,8 @@ function Setup({ onDone }) {
     if (!token) return;
     setBusy(true); setErr('');
     setPat(token);
-    try {
-      await at(TBL.exercises, { params: [['maxRecords', 1]] });
-      onDone();
-    } catch (e) {
+    try { await at(TBL.exercises, { params: [['maxRecords', 1]] }); onDone(); }
+    catch (e) {
       setPat('');
       setErr(e instanceof AuthError ? 'That token was rejected. Check its scopes and base access.' : String(e.message || e));
       setBusy(false);
@@ -982,375 +574,77 @@ function App() {
   const [ready, setReady] = useState(!!PAT);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('week');
-  const [selected, setSelected] = useState(todayISO());
-  const [days, setDays] = useState({});        // iso -> { logs, note, loaded, noteLoaded }
-  const [history, setHistory] = useState({});  // exerciseId|date -> two previous logs
-  const [openKey, setOpenKey] = useState(null);
-  const [failed, setFailed] = useState({});    // key -> retry thunk
-  const [sheet, setSheet] = useState(null);
-  const [theme, setTheme] = useState(document.documentElement.dataset.theme);
-  const [journal, setJournal] = useState({ logs: [], offset: undefined, more: true, loading: false, started: false });
-
-  const today = todayISO();
-  const daysRef = useRef(days);
-  daysRef.current = days;
-  const journalRef = useRef(journal);
-  journalRef.current = journal;
-  const scrollRef = useRef(null);
-
-  /* ---- load reference tables ---- */
-  const loadCore = useCallback(async () => {
-    const [ex, sch, races] = await Promise.all([atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races)]);
-    const exercises = ex.map(shapeExercise);
-    const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
-    const schedule = sch.map(shapeScheduleRow);
-    const payload = { exercises, exById, schedule, races: races.map(shapeRace), fetchedAt: Date.now() };
-    setData(payload);
-    window.LEDGER = { ...payload, rowsForDate, buildCards, day: d => dumpDay('Day', d, schedule, exById, null) };
-    return payload;
-  }, []);
 
   useEffect(() => {
     if (!ready) return;
     let live = true;
-    loadCore().catch(e => {
-      if (!live) return;
-      if (e instanceof AuthError) { setReady(false); setError('Token rejected — enter it again.'); }
-      else setError(String(e.message || e));
-    });
+    (async () => {
+      try {
+        const [ex, sch, races] = await Promise.all([
+          atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races),
+        ]);
+        const exercises = ex.map(shapeExercise);
+        const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
+        const schedule = sch.map(shapeRow);
+
+        const today = todayISO();
+        const monday = nextMonday(today);
+        const [todayLogs, todayNotes] = await Promise.all([
+          atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + today + '"']]),
+          atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + today + '"']]),
+        ]);
+        if (!live) return;
+
+        setData({ exercises, exById, schedule, races: races.map(shapeRace) });
+
+        const overlays = [...new Set(schedule.map(r => r.weekOf).filter(Boolean))].sort();
+        console.log('%cLedger v2 — data layer', 'font-size:14px;font-weight:700;color:#188038');
+        console.log(exercises.length + ' exercises · ' + schedule.length + ' schedule rows (' +
+                    schedule.filter(r => !r.weekOf).length + ' template, ' +
+                    schedule.filter(r => r.weekOf).length + ' overlay) · ' + races.length + ' races');
+        console.log('overlay weeks present: ' + (overlays.length ? overlays.join(', ') : 'none — every week resolves to the template'));
+
+        const logs = todayLogs.map(shapeLog);
+        dumpDay('TODAY', today, schedule, exById, logs);
+        dumpDay('NEXT MONDAY', monday, schedule, exById, null);
+
+        const { readiness, lines } = splitNotes((todayNotes[0] ? shapeNote(todayNotes[0]) : {}).notes);
+        console.log('today: ' + logs.length + ' logs · day note ' + (todayNotes.length ? 'present' : 'none') +
+                    ' · readiness ' + (readiness || 'unset') + ' · ' + lines.length + ' note lines');
+        if (logs.length) {
+          console.table(logs.map(l => {
+            const s = splitResult(l.text);
+            return { exercise: (exById[l.exerciseId] || {}).name || '?', result: s.body, pain: s.pain, RPE: s.rpe };
+          }));
+        }
+
+        window.LEDGER = {
+          exercises, exById, schedule, races: races.map(shapeRace),
+          weekRows, rowsForDate, linesForDate, splitResult, splitNotes, avatarFor,
+          day: d => dumpDay('Day', d, schedule, exById, null),
+          // Write paths are wired but deliberately not called during step 1.
+          materializeWeek: ws => materializeWeek(schedule, ws),
+          copyWeekInto: (from, target) => copyWeekInto(schedule, from, target),
+        };
+        console.log('%cwindow.LEDGER.day("YYYY-MM-DD") resolves any other date.', 'color:#5F6368');
+      } catch (e) {
+        if (!live) return;
+        if (e instanceof AuthError) { setReady(false); setError('Token rejected — enter it again.'); }
+        else setError(String(e.message || e));
+      }
+    })();
     return () => { live = false; };
-  }, [ready, loadCore]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState !== 'visible' || !data) return;
-      if (Date.now() - data.fetchedAt > STALE_MS) loadCore().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, [data, loadCore]);
-
-  /* ---- per-date logs + day note, cached ---- */
-  const patchDay = useCallback((date, fn) => {
-    setDays(prev => {
-      const cur = prev[date] || { logs: [], note: null, loaded: false, noteLoaded: false };
-      return { ...prev, [date]: { ...cur, ...fn(cur) } };
-    });
-  }, []);
-
-  const loadDay = useCallback(async (d, withNote) => {
-    const [logs, notes] = await Promise.all([
-      atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']]),
-      withNote ? atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']]) : Promise.resolve(null),
-    ]);
-    patchDay(d, cur => ({
-      logs: logs.map(shapeLog),
-      loaded: true,
-      note: notes ? (notes[0] ? shapeNote(notes[0]) : null) : cur.note,
-      noteLoaded: notes ? true : cur.noteLoaded,
-    }));
-  }, [patchDay]);
-
-  useEffect(() => {
-    if (!data) return;
-    const d = days[selected];
-    if (!d || !d.loaded || !d.noteLoaded) loadDay(selected, true).catch(() => {});
-    const rest = weekDays(selected).filter(x => x !== selected && !(days[x] && days[x].loaded));
-    rest.forEach((x, i) => setTimeout(() => loadDay(x, false).catch(() => {}), 120 * i));
-  }, [data, selected]);  // eslint-disable-line
-
-  /* ---- derived ---- */
-  const cards = useMemo(() => {
-    if (!data) return [];
-    return buildCards(rowsForDate(data.schedule, selected), data.exById);
-  }, [data, selected]);
-
-  const dayState = days[selected];
-  const logsByEx = useMemo(() => {
-    const m = {};
-    (dayState ? dayState.logs : []).forEach(l => { if (l.exerciseId) m[l.exerciseId] = l; });
-    return m;
-  }, [dayState]);
-
-  const dotDays = useMemo(() => {
-    const s = new Set();
-    weekDays(selected).forEach(d => { if (days[d] && days[d].logs.length) s.add(d); });
-    return s;
-  }, [days, selected]);
-
-  const nextRace = useMemo(() => {
-    if (!data) return null;
-    const up = data.races
-      .filter(r => r.date && r.date >= today && r.status !== 'Completed')
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
-    return up ? { name: up.name, days: daysUntil(up.date) } : null;
-  }, [data, today]);
-
-  /* ---- writes ---- */
-  const clearFail = useCallback(k => setFailed(f => { if (!(k in f)) return f; const n = { ...f }; delete n[k]; return n; }), []);
-  const markFail = useCallback((k, thunk) => setFailed(f => ({ ...f, [k]: thunk })), []);
-  const onAuthLost = useCallback(() => { setReady(false); setError('Token rejected — enter it again.'); }, []);
-
-  const saveResult = useCallback(async function save(date, exerciseId, text) {
-    const key = date + '|' + exerciseId;
-    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
-    const existing = snapshot.find(l => l.exerciseId === exerciseId);
-    const tmpId = 'tmp:' + Math.random().toString(36).slice(2);
-
-    patchDay(date, d => ({
-      logs: existing
-        ? d.logs.map(l => (l.exerciseId === exerciseId ? { ...l, text } : l))
-        : d.logs.concat([{ id: tmpId, exerciseId, date, text }]),
-    }));
-    clearFail(key);
-
-    try {
-      const res = await attempt(() => (existing ? updateLog(existing.id, text) : createLog(exerciseId, date, text)));
-      if (!existing && res && res.records && res.records[0]) {
-        const realId = res.records[0].id;
-        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmpId ? { ...l, id: realId } : l)) }));
-      }
-    } catch (e) {
-      if (e instanceof AuthError) return onAuthLost();
-      patchDay(date, () => ({ logs: snapshot }));
-      markFail(key, () => save(date, exerciseId, text));
-    }
-  }, [patchDay, clearFail, markFail, onAuthLost]);
-
-  const removeResult = useCallback(async function remove(date, exerciseId) {
-    const key = date + '|' + exerciseId;
-    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
-    const existing = snapshot.find(l => l.exerciseId === exerciseId);
-    if (!existing) return;
-
-    patchDay(date, d => ({ logs: d.logs.filter(l => l.exerciseId !== exerciseId) }));
-    clearFail(key);
-
-    try {
-      await attempt(() => deleteLog(existing.id));
-    } catch (e) {
-      if (e instanceof AuthError) return onAuthLost();
-      patchDay(date, () => ({ logs: snapshot }));
-      markFail(key, () => remove(date, exerciseId));
-    }
-  }, [patchDay, clearFail, markFail, onAuthLost]);
-
-  const writeNotes = useCallback(async function write(date, next) {
-    const key = 'note|' + date;
-    const snapshot = (daysRef.current[date] || {}).note || null;
-    patchDay(date, () => ({ note: { id: snapshot ? snapshot.id : 'tmp', date, notes: next }, noteLoaded: true }));
-    clearFail(key);
-    try {
-      const res = await attempt(() => (snapshot ? updateNote(snapshot.id, next) : createNote(date, next)));
-      if (!snapshot && res && res.records && res.records[0]) {
-        const realId = res.records[0].id;
-        patchDay(date, d => ({ note: { ...d.note, id: realId } }));
-      }
-    } catch (e) {
-      if (e instanceof AuthError) return onAuthLost();
-      patchDay(date, () => ({ note: snapshot }));
-      markFail(key, () => write(date, next));
-    }
-  }, [patchDay, clearFail, markFail, onAuthLost]);
-
-  /* ---- journal ---- */
-  const loadJournal = useCallback(async (reset) => {
-    const cur = journalRef.current;
-    if (cur.loading) return;
-    setJournal(j => ({ ...j, loading: true, started: true }));
-    try {
-      const { records, offset } = await atPage(TBL.logs, [
-        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['pageSize', 100],
-      ], reset ? undefined : cur.offset);
-      setJournal(j => ({
-        logs: (reset ? [] : j.logs).concat(records.map(shapeLog)),
-        offset, more: !!offset, loading: false, started: true,
-      }));
-    } catch (e) {
-      if (e instanceof AuthError) return onAuthLost();
-      setJournal(j => ({ ...j, loading: false }));
-    }
-  }, [onAuthLost]);
-
-  // Day Notes for a date rendered in the Journal, fetched once.
-  const notesAsked = useRef(new Set());
-  const ensureNote = useCallback(date => {
-    if (notesAsked.current.has(date)) return;
-    const d = daysRef.current[date];
-    if (d && d.noteLoaded) return;
-    notesAsked.current.add(date);
-    atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + date + '"']])
-      .then(rs => patchDay(date, () => ({ note: rs[0] ? shapeNote(rs[0]) : null, noteLoaded: true })))
-      .catch(() => notesAsked.current.delete(date));
-  }, [patchDay]);
-
-  const openFromJournal = (date, lineKey) => {
-    setTab('week');
-    setSelected(date);
-    setOpenKey(lineKey || null);
-  };
-
-  const noteLines = d => { const n = (days[d] || {}).note; return n && n.notes ? n.notes.split('\n').map(s => s.trim()).filter(Boolean) : []; };
-
-  const toggleLine = line => {
-    const existing = logsByEx[line.exerciseId];
-    if (!existing) return saveResult(selected, line.exerciseId, 'Completed');
-    if (existing.text.trim() === 'Completed') return removeResult(selected, line.exerciseId);
-    setSheet({ type: 'confirm', line, text: existing.text });
-  };
-
-  const saveBlock = (card, vals) => {
-    uniqueLines(card).forEach(l => {
-      const v = (vals[l.exerciseId] || '').trim();
-      if (!v) return;                                        // empty fields are left alone
-      const cur = logsByEx[l.exerciseId];
-      if (cur && cur.text === v) return;                     // unchanged
-      saveResult(selected, l.exerciseId, v);
-    });
-    setSheet(null);
-  };
-
-  /* ---- line dropdown history ---- */
-  useEffect(() => {
-    if (!openKey || !data) return;
-    const line = cards.flatMap(c => c.lines).find(l => l.key === openKey);
-    if (!line) return;
-    const k = line.exerciseId + '|' + selected;
-    if (history[k] !== undefined) return;
-    setHistory(h => ({ ...h, [k]: null }));
-    const name = (data.exById[line.exerciseId] || {}).name || '';
-    atAll(TBL.logs, [
-      ['filterByFormula', 'AND({Exercise} = "' + esc(name) + '", {Log Date} != "' + selected + '")'],
-      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
-      ['maxRecords', 2],
-    ]).then(rs => setHistory(h => ({ ...h, [k]: rs.map(shapeLog) })))
-      .catch(() => setHistory(h => ({ ...h, [k]: [] })));
-  }, [openKey, data, selected]);  // eslint-disable-line
-
-  const detailFor = useCallback(line => {
-    const prev = history[line.exerciseId + '|' + selected];
-    if (prev === undefined || prev === null) return null;
-    const cur = logsByEx[line.exerciseId];
-    return { current: cur ? cur.text : '', currentDate: selected, previous: prev };
-  }, [history, logsByEx, selected]);
-
-  const failedFor = useCallback(line => failed[selected + '|' + line.exerciseId], [failed, selected]);
-
-  useEffect(() => {
-    if (tab === 'journal' && data && !journal.started) loadJournal(true);
-  }, [tab, data, journal.started, loadJournal]);
-
-  // Infinite scroll for the Journal.
-  const onScroll = e => {
-    if (tab !== 'journal') return;
-    const el = e.currentTarget;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
-      const j = journalRef.current;
-      if (j.more && !j.loading) loadJournal(false);
-    }
-  };
-
-  /* ---- swipe weeks ---- */
-  const touch = useRef(null);
-  const onTouchStart = e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
-  const onTouchEnd = e => {
-    const s = touch.current; touch.current = null;
-    if (!s || tab !== 'week') return;
-    const dx = e.changedTouches[0].clientX - s.x;
-    const dy = e.changedTouches[0].clientY - s.y;
-    if (Math.abs(dx) > 60 && Math.abs(dy) < 45) { setSelected(addDays(selected, dx < 0 ? 7 : -7)); setOpenKey(null); }
-  };
-
-  // Changing day or tab returns the card area to the top, as the mockup does.
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [selected, tab]);
-
-  const toggleTheme = () => {
-    const t = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = t;
-    localStorage.setItem(LS_THEME, t);
-    setTheme(t);
-  };
+  }, [ready]);
 
   if (!ready) return <div className="phone"><Setup onDone={() => { setError(''); setReady(true); }} /></div>;
-  if (error) return <div className="phone"><div className="boot"><span style={{ color: 'var(--red)' }}>{error}</span></div></div>;
-  if (!data) return <div className="phone"><div className="boot">Loading…</div></div>;
-
-  const TITLES = {
-    week: ['', fmtLong(selected) + ' - ' + dowName(selected)],
-    journal: ['Training log', 'Journal'],
-    races: ['Calendar', 'Races'],
-    prs: ['Benchmarks', 'Personal Records'],
-    exercises: ['Library', 'Exercises'],
-  };
-  const [label, title] = TITLES[tab];
 
   return (
     <div className="phone">
-      <Header race={nextRace} label={label} title={title} onTheme={toggleTheme}
-              onDate={d => { setTab('week'); setSelected(d); setOpenKey(null); }}
-              strip={tab === 'week' ? (
-                <WeekStrip days={weekDays(selected)} selected={selected} today={today} dotDays={dotDays}
-                           onPick={d => { setSelected(d); setOpenKey(null); }} />
-              ) : null} />
-
-      <div className="scroll" ref={scrollRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onScroll={onScroll}>
-        {tab === 'week' && (
-          <React.Fragment>
-            {cards.length === 0 && <div className="card"><h3>Rest day</h3><div className="desc">Nothing scheduled for {dowName(selected)}.</div></div>}
-            {cards.map(c => (
-              <BlockCard key={c.name} card={c} logsByEx={logsByEx}
-                         openKey={openKey} setOpenKey={setOpenKey} detailFor={detailFor} failedFor={failedFor}
-                         onToggle={toggleLine}
-                         onLogResult={card => setSheet({ type: 'log', card })}
-                         onHistory={card => setSheet({ type: 'history', card })}
-                         onAdd={() => setSheet({ type: 'quicklog' })} />
-            ))}
-            <NotesCard note={dayState ? dayState.note : null}
-                       retry={failed['note|' + selected]}
-                       onAdd={() => setSheet({ type: 'note' })}
-                       onDelete={i => {
-                         const lines = noteLines(selected);
-                         lines.splice(i, 1);
-                         writeNotes(selected, lines.join('\n'));
-                       }} />
-          </React.Fragment>
-        )}
-        {tab === 'journal' &&
-          <JournalTab data={data} days={days} logs={journal.logs} more={journal.more} loading={journal.loading}
-                      onLoadMore={() => loadJournal(false)} onOpenLine={openFromJournal} ensureNote={ensureNote} />}
-        {tab === 'races' && <RacesTab data={data} />}
-        {tab === 'exercises' && <ExercisesTab data={data} />}
-        {tab === 'prs' && <PRsTab data={data} onOpen={pr => setSheet({ type: 'pr', pr })} />}
+      <div className="boot">
+        {error ? <span style={{ color: 'var(--red)' }}>{error}</span>
+               : data ? <span>Data layer loaded — open the console.<br />{data.exercises.length} exercises · {data.schedule.length} schedule rows</span>
+                      : <span>Loading…</span>}
       </div>
-
-      <div className="tabs">
-        <button className={tab === 'week' ? 'on' : ''} onClick={() => setTab('week')}><IconWeek />Week</button>
-        <button className={tab === 'journal' ? 'on' : ''} onClick={() => setTab('journal')}><IconJour />Journal</button>
-        <button className={tab === 'races' ? 'on' : ''} onClick={() => setTab('races')}><IconFlag />Races</button>
-        <button className={tab === 'prs' ? 'on' : ''} onClick={() => setTab('prs')}><IconBolt />PRs</button>
-        <button className={tab === 'exercises' ? 'on' : ''} onClick={() => setTab('exercises')}><IconBar />Exercises</button>
-      </div>
-
-      {sheet && sheet.type === 'log' &&
-        <LogSheet card={sheet.card} date={selected} logsByEx={logsByEx}
-                  onSave={vals => saveBlock(sheet.card, vals)} onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'history' &&
-        <HistorySheet card={sheet.card} onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'note' &&
-        <NoteSheet date={selected}
-                   onSave={v => { const cur = noteLines(selected); writeNotes(selected, cur.concat([v.trim()]).join('\n')); setSheet(null); }}
-                   onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'pr' &&
-        <PRHistorySheet pr={sheet.pr} onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'quicklog' &&
-        <QuickLogSheet data={data} date={selected}
-                       onSave={(when, exId, text) => { saveResult(when, exId, text); setSheet(null); }}
-                       onClose={() => setSheet(null)} />}
-      {sheet && sheet.type === 'confirm' &&
-        <ConfirmSheet line={sheet.line} text={sheet.text}
-                      onConfirm={() => { removeResult(selected, sheet.line.exerciseId); setSheet(null); }}
-                      onClose={() => setSheet(null)} />}
     </div>
   );
 }
