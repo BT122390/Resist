@@ -210,6 +210,19 @@
   .toast .undo{background:none;border:0;color:#8AB4F8;font-weight:600;font-size:15px;padding:4px 6px}
   .toast.err{background:var(--red);color:#fff}
   .toast.err .undo{color:#fff;text-decoration:underline}
+  .ctx{gap:10px}
+  .ctx .date{flex:none;white-space:nowrap}
+  .ctx .race{flex:1;min-width:0;justify-content:flex-end}
+  .sw .del{z-index:0;visibility:hidden}
+  .sw.swiping .del{visibility:visible}
+  .sw .row{z-index:1}
+  .ctx .race{display:flex;gap:4px;align-items:baseline}
+  .ctx .race .rn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ctx .race .rd{flex:none}
+  .chipmini{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 6px;margin-left:6px;background:var(--bar);color:var(--muted)}
+  .chipmini[data-amber="amber"]{background:#FEF7E0;color:#B06000}
+  .chipmini[data-amber="red"]{background:var(--red-soft);color:var(--red)}
+  [data-theme="dark"] .chipmini[data-amber="amber"]{background:#3A2F14;color:#F9AB00}
   .boot{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:var(--muted);font-size:15px}
   .setup{padding:44px 24px;color:var(--text)}
   .setup h1{font-size:26px;font-weight:600;margin-bottom:6px}
@@ -295,17 +308,32 @@ const setPat = v => { PAT = v; v ? localStorage.setItem(LS_PAT, v) : localStorag
 const qs = pairs => pairs.map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
 const esc = s => String(s).replace(/"/g, '\\"');
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function at(table, { method = 'GET', params = [], body } = {}) {
   const url = 'https://api.airtable.com/v0/' + BASE + '/' + table + (params.length ? '?' + qs(params) : '');
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: 'Bearer ' + PAT, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (res.status === 401 || res.status === 403) { setPat(''); throw new AuthError('Airtable rejected the token'); }
-  if (!res.ok) throw new Error('Airtable ' + res.status + ': ' + (await res.text()).slice(0, 200));
-  return res.status === 204 ? {} : res.json();
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: 'Bearer ' + PAT, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401 || res.status === 403) { setPat(''); throw new AuthError('Airtable rejected the token'); }
+    // 5 requests/sec per base; wait out the limit rather than surfacing it.
+    if (res.status === 429 && attempt < 4) { await sleep(400 * (attempt + 1)); continue; }
+    if (!res.ok) throw new Error('Airtable ' + res.status + ': ' + (await res.text()).slice(0, 200));
+    return res.status === 204 ? {} : res.json();
+  }
 }
+
+// Keeps the per-exercise "last result" fan-out under the rate limit.
+function makeLimiter(n) {
+  let active = 0; const queue = [];
+  const next = () => { if (active >= n || !queue.length) return; active++; const { fn, res, rej } = queue.shift();
+    fn().then(res, rej).finally(() => { active--; next(); }); };
+  return fn => new Promise((res, rej) => { queue.push({ fn, res, rej }); next(); });
+}
+const limit = makeLimiter(3);
 
 async function atAll(table, params = []) {
   const out = [];
@@ -504,11 +532,15 @@ function linesForDate(schedule, dateISO, exById) {
 // into Week Of = weekStart rows. Templates are never touched by this path.
 async function materializeWeek(schedule, weekStart) {
   const already = schedule.filter(r => r.weekOf === weekStart);
-  if (already.length) return { created: [], rows: already, wasNeeded: false };
+  if (already.length) return { rows: already, map: null, wasNeeded: false };
 
   const template = schedule.filter(r => !r.weekOf);
   const made = await createMany(TBL.schedule, template.map(r => rowFields(r, weekStart)));
-  return { created: made.map(shapeRow), rows: made.map(shapeRow), wasNeeded: true };
+  const rows = made.map(shapeRow);
+  // Airtable returns created records in the order sent, so a template row and
+  // its copy line up by index.
+  const map = Object.fromEntries(template.map((t, i) => [t.id, rows[i]]));
+  return { rows, map, wasNeeded: true };
 }
 
 // Copy a week's resolved rows forward into another week's overlay.
@@ -540,7 +572,198 @@ function dumpDay(label, dateISO, schedule, exById, logs) {
   return lines;
 }
 
-/* ═══════════════════════ boot (step 1: data layer only) ═══════════════════════ */
+/* ═══════════════════════ writes ═══════════════════════ */
+
+const createLog = (exerciseId, date, text) =>
+  at(TBL.logs, { method: 'POST', body: { records: [{ fields: { 'Exercise': [exerciseId], 'Log Date': date, 'Log Text': text } }] } });
+const updateLog = (id, text) =>
+  at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields: { 'Log Text': text } }] } });
+const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
+
+const setRowExercises = (id, exercises) =>
+  at(TBL.schedule, { method: 'PATCH', body: { records: [{ id, fields: { 'Exercise': exercises } }] } });
+
+/* ═══════════════════════ icons ═══════════════════════ */
+
+const IcCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4"><path d="M5 12l5 5 9-10" /></svg>;
+const IcGrip  = () => <svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>;
+const IcBar   = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12" /></svg>;
+const IcFlag  = () => <svg viewBox="0 0 24 24"><path d="M5 3v18M5 4h11l-2 3 2 3H5" /></svg>;
+const IcGlass = () => <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M16 16l5 5" /></svg>;
+const IcMoon  = () => <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c-5 0-9-4-9-9z" /></svg>;
+const IcPlus  = () => <svg viewBox="0 0 24 24" stroke="#fff"><path d="M12 5v14M5 12h14" /></svg>;
+
+/* ═══════════════════════ toast ═══════════════════════ */
+
+function Toast({ toast, onAction }) {
+  if (!toast) return null;
+  return (
+    <div className={'toast on' + (toast.kind === 'error' ? ' err' : '')}>
+      <span>{toast.text}</span>
+      {toast.action && <button className="undo" onClick={onAction}>{toast.action}</button>}
+    </div>
+  );
+}
+
+/* ═══════════════════════ day pill bar ═══════════════════════ */
+
+function DayBar({ days, selected, today, dots, onPick, onHome }) {
+  const press = useRef(null);
+  return (
+    <div className="top">
+      <div className="daybar">
+        {days.map(d => {
+          const isToday = d === today;
+          const cls = 'dbtn' + (isToday ? ' on' : '') + (!isToday && d === selected ? ' sel' : '');
+          return (
+            <div key={d} className={cls}
+                 onPointerDown={() => { press.current = setTimeout(onHome, 550); }}
+                 onPointerUp={() => { clearTimeout(press.current); }}
+                 onPointerLeave={() => { clearTimeout(press.current); }}
+                 onClick={() => onPick(d)}>
+              <span>{DOW[parseISO(d).getDay()].slice(0, 3).toUpperCase()}</span>
+              <b>{parseISO(d).getDate()}</b>
+              {dots.has(d) && <div className="d" />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ rows ═══════════════════════ */
+
+function NotesRow({ date, readiness, lines, onOpen }) {
+  const r = readiness ? READINESS[readiness] : null;
+  return (
+    <div className="row note" onClick={onOpen}>
+      <div className="av"><i>✎</i></div>
+      <div className="body">
+        <div className="t">
+          <div className="name">{dowName(date)} notes</div>
+          <div className="when">{r && <React.Fragment><span className={'rdot ' + r.key} />{readiness}</React.Fragment>}</div>
+        </div>
+        <div className="p1">{lines[0] || <span style={{ color: 'var(--faint)' }}>Add a note</span>}</div>
+        <div className="p2">{lines[1] || ''}</div>
+      </div>
+    </div>
+  );
+}
+
+// Gmail row with swipe-to-remove and a drag handle.
+function ExerciseRow({ line, log, last, onToggle, onOpen, onRemove, onDragStart, swipeOpen, setSwipeOpen }) {
+  const sw = useRef(null);
+  const el = useRef(null);
+  const g = useRef(null);      // live gesture: { x0, y0, lastX, axis }
+  const moved = useRef(false);
+
+  const setX = x => { if (el.current) el.current.style.transform = x ? 'translateX(' + x + 'px)' : ''; };
+  const swiping = on => { if (sw.current) sw.current.classList.toggle('swiping', on); };
+  const reset = () => { setX(0); swiping(false); };
+
+  useEffect(() => { if (swipeOpen !== line.key) reset(); }, [swipeOpen, line.key]);
+
+  const down = e => {
+    if (e.target.closest('.hdl') || e.target.closest('.av')) return;
+    g.current = { x0: e.clientX, y0: e.clientY, lastX: e.clientX, axis: null };
+    moved.current = false;
+    if (el.current) el.current.style.transition = 'none';
+  };
+
+  const move = e => {
+    const s = g.current;
+    if (!s) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    // Decide once whether this is a scroll or a swipe, and stay decided.
+    if (s.axis === null) {
+      if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) { s.axis = 'y'; reset(); return; }
+      if (dx < -12 && Math.abs(dx) > Math.abs(dy) * 1.5) { s.axis = 'x'; swiping(true); }
+      else return;
+    }
+    if (s.axis !== 'x') return;
+    s.lastX = e.clientX;
+    moved.current = true;
+    setX(Math.max(Math.min(0, dx), -110));
+  };
+
+  // pointercancel means the browser took the gesture over for scrolling; it
+  // carries no meaningful coordinate, so it must never commit a removal.
+  const finish = commit => () => {
+    const s = g.current;
+    g.current = null;
+    if (el.current) el.current.style.transition = '';
+    const close = () => { reset(); if (swipeOpen === line.key) setSwipeOpen(null); };
+    if (!s || s.axis !== 'x' || !commit) return close();
+    const dx = s.lastX - s.x0;
+    if (dx < -170) { setX(-window.innerWidth); setTimeout(onRemove, 160); }
+    else if (dx < -55) { setX(-96); setSwipeOpen(line.key); }
+    else close();
+  };
+
+  const done = !!log;
+  const result = log ? splitResult(log.text) : null;
+  const when = done ? 'Done' : (last ? fmtShort(last.date) : '');
+
+  // A bare "Completed" marker says nothing the green Done does not already say.
+  let detail = '';
+  if (done && !isCompleted(log.text)) detail = 'Today: ' + (isSkipped(log.text) ? 'Skipped' : result.body);
+  else if (!done && last) detail = 'Last: ' + splitResult(last.text).body;
+
+  const first = line.prescription || detail;
+  const second = line.prescription ? detail : '';
+
+  return (
+    <div className="sw" ref={sw}>
+      <div className="del" onClick={onRemove}>Remove</div>
+      <div ref={el} className={'row' + (done ? ' done' : '')}
+           onPointerDown={down} onPointerMove={move} onPointerUp={finish(true)} onPointerCancel={finish(false)}
+           onClick={e => { if (moved.current) { e.stopPropagation(); moved.current = false; return; } onOpen(); }}>
+        <div className="av" style={{ background: line.av.color }}
+             onClick={e => { e.stopPropagation(); onToggle(); }}>
+          <i>{line.av.letter}</i><IcCheck />
+        </div>
+        <div className="body">
+          <div className="t">
+            <div className="name">{line.name}</div>
+            <div className="when">{when}</div>
+          </div>
+          <div className="p1">{first || ' '}</div>
+          <div className="p2">
+            {second}
+            {done && result && result.pain != null && <span className="chipmini" data-amber={result.pain >= 3 ? 'red' : result.pain >= 2 ? 'amber' : ''}>pain {result.pain}</span>}
+            {done && result && result.rpe != null && <span className="chipmini">RPE {result.rpe}</span>}
+          </div>
+        </div>
+        {swipeOpen !== line.key && (
+          <div className="hdl" onPointerDown={e => onDragStart(e, line.key)}><IcGrip /></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ bottom bar ═══════════════════════ */
+
+function BottomBar({ raceDays, onTheme, inert }) {
+  const btn = (icon, label, onClick, cls) => (
+    <div className="bb" onClick={onClick}>
+      <div className={'c' + (cls || '')}>{icon}{label === 'Races' && raceDays != null && <div className="badge">{raceDays}</div>}</div>
+      <small>{label}</small>
+    </div>
+  );
+  return (
+    <div className="bot">
+      {btn(<IcBar />, 'Exercises', inert)}
+      {btn(<IcFlag />, 'Races', inert)}
+      {btn(<IcGlass />, 'Search', inert)}
+      {btn(<IcMoon />, 'Theme', onTheme)}
+      {btn(<IcPlus />, 'Add', inert, ' add')}
+    </div>
+  );
+}
+
+/* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
   const [v, setV] = useState('');
@@ -571,80 +794,369 @@ function Setup({ onDone }) {
 }
 
 function App() {
-  const [ready, setReady] = useState(!!PAT);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState('');
+  const [ready, setReady]   = useState(!!PAT);
+  const [data, setData]     = useState(null);
+  const [error, setError]   = useState('');
+  const [selected, setSel]  = useState(todayISO());
+  const [days, setDays]     = useState({});      // iso -> { logs, note, loaded, noteLoaded }
+  const [lastBy, setLastBy] = useState({});      // exerciseId -> last log before the selected date, or null
+  const [toast, setToast]   = useState(null);
+  const [hidden, setHidden] = useState({});      // line key -> true while a removal is in flight
+  const [orderOf, setOrder] = useState({});      // date -> [line key] while a reorder is in flight
+  const [swipeOpen, setSwipeOpen] = useState(null);
+  const [theme, setTheme]   = useState(document.documentElement.dataset.theme);
+
+  const today = todayISO();
+  const daysRef = useRef(days);       daysRef.current = days;
+  const schedRef = useRef([]);        schedRef.current = data ? data.schedule : [];
+  const toastTimer = useRef(null);
+
+  /* ---- toasts ---- */
+  const showToast = useCallback((text, opts = {}) => {
+    clearTimeout(toastTimer.current);
+    setToast({ text, ...opts });
+    toastTimer.current = setTimeout(() => setToast(null), opts.ms || 5000);
+  }, []);
+  const hideToast = useCallback(() => { clearTimeout(toastTimer.current); setToast(null); }, []);
+
+  /* ---- reference tables ---- */
+  const loadCore = useCallback(async () => {
+    const [ex, sch, races] = await Promise.all([atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races)]);
+    const exercises = ex.map(shapeExercise);
+    setData({
+      exercises,
+      exById: Object.fromEntries(exercises.map(e => [e.id, e])),
+      schedule: sch.map(shapeRow),
+      races: races.map(shapeRace),
+      fetchedAt: Date.now(),
+    });
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
     let live = true;
-    (async () => {
-      try {
-        const [ex, sch, races] = await Promise.all([
-          atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races),
-        ]);
-        const exercises = ex.map(shapeExercise);
-        const exById = Object.fromEntries(exercises.map(e => [e.id, e]));
-        const schedule = sch.map(shapeRow);
-
-        const today = todayISO();
-        const monday = nextMonday(today);
-        const [todayLogs, todayNotes] = await Promise.all([
-          atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + today + '"']]),
-          atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + today + '"']]),
-        ]);
-        if (!live) return;
-
-        setData({ exercises, exById, schedule, races: races.map(shapeRace) });
-
-        const overlays = [...new Set(schedule.map(r => r.weekOf).filter(Boolean))].sort();
-        console.log('%cLedger v2 — data layer', 'font-size:14px;font-weight:700;color:#188038');
-        console.log(exercises.length + ' exercises · ' + schedule.length + ' schedule rows (' +
-                    schedule.filter(r => !r.weekOf).length + ' template, ' +
-                    schedule.filter(r => r.weekOf).length + ' overlay) · ' + races.length + ' races');
-        console.log('overlay weeks present: ' + (overlays.length ? overlays.join(', ') : 'none — every week resolves to the template'));
-
-        const logs = todayLogs.map(shapeLog);
-        dumpDay('TODAY', today, schedule, exById, logs);
-        dumpDay('NEXT MONDAY', monday, schedule, exById, null);
-
-        const { readiness, lines } = splitNotes((todayNotes[0] ? shapeNote(todayNotes[0]) : {}).notes);
-        console.log('today: ' + logs.length + ' logs · day note ' + (todayNotes.length ? 'present' : 'none') +
-                    ' · readiness ' + (readiness || 'unset') + ' · ' + lines.length + ' note lines');
-        if (logs.length) {
-          console.table(logs.map(l => {
-            const s = splitResult(l.text);
-            return { exercise: (exById[l.exerciseId] || {}).name || '?', result: s.body, pain: s.pain, RPE: s.rpe };
-          }));
-        }
-
-        window.LEDGER = {
-          exercises, exById, schedule, races: races.map(shapeRace),
-          weekRows, rowsForDate, linesForDate, splitResult, splitNotes, avatarFor,
-          day: d => dumpDay('Day', d, schedule, exById, null),
-          // Write paths are wired but deliberately not called during step 1.
-          materializeWeek: ws => materializeWeek(schedule, ws),
-          copyWeekInto: (from, target) => copyWeekInto(schedule, from, target),
-        };
-        console.log('%cwindow.LEDGER.day("YYYY-MM-DD") resolves any other date.', 'color:#5F6368');
-      } catch (e) {
-        if (!live) return;
-        if (e instanceof AuthError) { setReady(false); setError('Token rejected — enter it again.'); }
-        else setError(String(e.message || e));
-      }
-    })();
+    loadCore().catch(e => {
+      if (!live) return;
+      if (e instanceof AuthError) { setReady(false); setError(''); }
+      else setError(String(e.message || e));
+    });
     return () => { live = false; };
-  }, [ready]);
+  }, [ready, loadCore]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || !data) return;
+      if (Date.now() - data.fetchedAt > STALE_MS) loadCore().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [data, loadCore]);
+
+  /* ---- per-date logs and note ---- */
+  const patchDay = useCallback((date, fn) => {
+    setDays(prev => {
+      const cur = prev[date] || { logs: [], note: null, loaded: false, noteLoaded: false };
+      return { ...prev, [date]: { ...cur, ...fn(cur) } };
+    });
+  }, []);
+
+  const loadDay = useCallback(async (d, withNote) => {
+    const [logs, notes] = await Promise.all([
+      limit(() => atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']])),
+      withNote ? limit(() => atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']])) : Promise.resolve(null),
+    ]);
+    patchDay(d, cur => ({
+      logs: logs.map(shapeLog),
+      loaded: true,
+      note: notes ? (notes[0] ? shapeNote(notes[0]) : null) : cur.note,
+      noteLoaded: notes ? true : cur.noteLoaded,
+    }));
+  }, [patchDay]);
+
+  useEffect(() => {
+    if (!data) return;
+    const d = days[selected];
+    if (!d || !d.loaded || !d.noteLoaded) loadDay(selected, true).catch(() => {});
+    weekDays(selected).forEach(x => {
+      if (x !== selected && !(days[x] && days[x].loaded)) loadDay(x, false).catch(() => {});
+    });
+  }, [data, selected]);  // eslint-disable-line
+
+  /* ---- resolved lines for the day ---- */
+  const resolved = useMemo(() => {
+    if (!data) return { lines: [], isOverlay: false, weekStart: weekStartOf(selected) };
+    return linesForDate(data.schedule, selected, data.exById);
+  }, [data, selected]);
+
+  const lines = useMemo(() => {
+    let ls = resolved.lines.filter(l => !hidden[l.key]);
+    const ord = orderOf[selected];
+    if (ord) {
+      const pos = Object.fromEntries(ord.map((k, i) => [k, i]));
+      ls = [...ls].sort((a, b) => (pos[a.key] ?? 1e9) - (pos[b.key] ?? 1e9));
+    }
+    return ls;
+  }, [resolved, hidden, orderOf, selected]);
+
+  const dayState = days[selected];
+  const logsByEx = useMemo(() => {
+    const m = {};
+    (dayState ? dayState.logs : []).forEach(l => { if (l.exerciseId) m[l.exerciseId] = l; });
+    return m;
+  }, [dayState]);
+
+  const dots = useMemo(() => {
+    const s = new Set();
+    weekDays(selected).forEach(d => { if (days[d] && days[d].logs.length) s.add(d); });
+    return s;
+  }, [days, selected]);
+
+  const noteState = useMemo(() => splitNotes(dayState && dayState.note ? dayState.note.notes : ''), [dayState]);
+
+  const nextRace = useMemo(() => {
+    if (!data) return null;
+    const r = data.races.filter(x => x.date && x.date >= today && x.status !== 'Completed')
+                        .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return r ? { name: r.name, days: daysUntil(r.date) } : null;
+  }, [data, today]);
+
+  /* ---- last result per visible exercise ---- */
+  useEffect(() => {
+    if (!data) return;
+    lines.forEach(l => {
+      const key = l.exerciseId + '|' + selected;
+      if (lastBy[key] !== undefined) return;
+      setLastBy(m => ({ ...m, [key]: null }));
+      limit(() => atAll(TBL.logs, [
+        ['filterByFormula', 'AND({Exercise} = "' + esc(l.name) + '", {Log Date} < "' + selected + '")'],
+        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['maxRecords', 1],
+      ])).then(rs => setLastBy(m => ({ ...m, [key]: rs[0] ? shapeLog(rs[0]) : null })))
+         .catch(() => {});
+    });
+  }, [data, lines, selected]);  // eslint-disable-line
+
+  /* ---- copy-on-write ---- */
+  // Returns a map from template row id to its copy, or null when the week is
+  // already an overlay.
+  const ensureOverlay = useCallback(async date => {
+    const ws = weekStartOf(date);
+    if (schedRef.current.some(r => r.weekOf === ws)) return null;
+    const { rows, map } = await materializeWeek(schedRef.current, ws);
+    setData(d => ({ ...d, schedule: d.schedule.concat(rows) }));
+    schedRef.current = schedRef.current.concat(rows);
+    return map;
+  }, []);
+
+  /* ---- toggle done ---- */
+  const toggleLine = async line => {
+    const existing = logsByEx[line.exerciseId];
+    if (existing && !isCompleted(existing.text)) {
+      if (!window.confirm('Remove the logged result for ' + line.name + '?\n\n' + existing.text)) return;
+    }
+    const date = selected;
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    if (existing) {
+      patchDay(date, d => ({ logs: d.logs.filter(l => l.exerciseId !== line.exerciseId) }));
+      try { await deleteLog(existing.id); }
+      catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not remove that result.', { kind: 'error' }); }
+    } else {
+      const tmp = 'tmp:' + Math.random().toString(36).slice(2);
+      patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text: 'Completed' }]) }));
+      try {
+        const res = await createLog(line.exerciseId, date, 'Completed');
+        const id = res.records[0].id;
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+      } catch (e) { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that.', { kind: 'error' }); }
+    }
+  };
+
+  /* ---- remove a line, with Undo ---- */
+  // The write lands straight away; Undo puts the row back rather than holding
+  // the delete, so closing the app mid-toast cannot lose the edit.
+  const removeLine = async line => {
+    setSwipeOpen(null);
+    setHidden(h => ({ ...h, [line.key]: true }));
+    const date = selected;
+
+    try {
+      const map = await ensureOverlay(date);
+      const materialized = !!map;
+      const rowId = map && map[line.rowId] ? map[line.rowId].id : line.rowId;
+      const row = schedRef.current.find(r => r.id === rowId);
+      if (!row) throw new Error('row not found');
+
+      let undo;
+      if (row.exercises.length > 1) {
+        // The row links several exercises; drop just this one rather than
+        // taking its siblings with it.
+        const before = row.exercises;
+        const next = before.filter(id => id !== line.exerciseId);
+        await setRowExercises(rowId, next);
+        setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, exercises: next } : r)) }));
+        undo = async () => {
+          await setRowExercises(rowId, before);
+          setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, exercises: before } : r)) }));
+        };
+      } else {
+        const fields = rowFields(row);
+        await deleteMany(TBL.schedule, [rowId]);
+        setData(d => ({ ...d, schedule: d.schedule.filter(r => r.id !== rowId) }));
+        undo = async () => {
+          const made = await createMany(TBL.schedule, [fields]);
+          const back = made.map(shapeRow);
+          setData(d => ({ ...d, schedule: d.schedule.concat(back) }));
+          // The row comes back under a new id, so the old line key is stale.
+          setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+        };
+      }
+
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+      showToast((materialized ? 'Customizing week of ' + fmtShort(weekStartOf(date)) + ' · removed ' : 'Removed ') + line.name, {
+        action: 'Undo',
+        onAction: () => {
+          hideToast();
+          undo().catch(() => showToast('Could not undo that.', { kind: 'error' }));
+        },
+      });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+      showToast('Could not remove ' + line.name + '.', {
+        kind: 'error', action: 'Retry', onAction: () => { hideToast(); removeLine(line); },
+      });
+    }
+  };
+
+  /* ---- drag reorder ---- */
+  const listRef = useRef(null);
+  const drag = useRef(null);
+
+  const onDragStart = (e, key) => {
+    e.preventDefault(); e.stopPropagation();
+    const nodes = [...listRef.current.querySelectorAll('.sw')];
+    const keys = lines.map(l => l.key);
+    const from = keys.indexOf(key);
+    if (from < 0) return;
+    const el = nodes[from];
+    el.classList.add('lift');
+    drag.current = { key, from, to: from, nodes, keys, el };
+
+    const move = ev => {
+      const d = drag.current; if (!d) return;
+      d.nodes.forEach(n => n.classList.remove('gap-top', 'gap-bot'));
+      let to = d.nodes.length - 1;
+      for (let i = 0; i < d.nodes.length; i++) {
+        const b = d.nodes[i].getBoundingClientRect();
+        if (ev.clientY < b.top + b.height / 2) { to = i; break; }
+      }
+      d.to = to;
+      const target = d.nodes[to];
+      if (target && target !== d.el) target.classList.add(to > d.from ? 'gap-bot' : 'gap-top');
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const d = drag.current; drag.current = null;
+      if (!d) return;
+      d.nodes.forEach(n => n.classList.remove('gap-top', 'gap-bot', 'lift'));
+      if (d.to !== d.from) commitReorder(d.keys, d.from, d.to);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+
+  const commitReorder = async (keys, from, to) => {
+    const next = [...keys];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    const date = selected;
+    setOrder(o => ({ ...o, [date]: next }));
+
+    try {
+      const map = await ensureOverlay(date);
+      // One line per exercise, so several lines can share a row; the row takes
+      // the position of its first line.
+      const byKey = Object.fromEntries(resolved.lines.map(l => [l.key, l]));
+      const seen = new Set(); const rowOrder = [];
+      next.forEach(k => {
+        const l = byKey[k]; if (!l) return;
+        const rowId = map && map[l.rowId] ? map[l.rowId].id : l.rowId;
+        if (!seen.has(rowId)) { seen.add(rowId); rowOrder.push(rowId); }
+      });
+      const records = rowOrder.map((id, i) => ({ id, fields: { 'Order': (i + 1) * 10 } }));
+      await updateMany(TBL.schedule, records);
+      const orderById = Object.fromEntries(records.map(r => [r.id, r.fields['Order']]));
+      setData(d => ({ ...d, schedule: d.schedule.map(r => (orderById[r.id] != null ? { ...r, order: orderById[r.id] } : r)) }));
+      setOrder(o => { const n = { ...o }; delete n[date]; return n; });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setOrder(o => { const n = { ...o }; delete n[date]; return n; });
+      showToast('Could not save the new order.', { kind: 'error' });
+    }
+  };
+
+  /* ---- week swipe ---- */
+  const touch = useRef(null);
+  const onTouchStart = e => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+  const onTouchEnd = e => {
+    const s = touch.current; touch.current = null;
+    if (!s) return;
+    const dx = e.changedTouches[0].clientX - s.x;
+    const dy = e.changedTouches[0].clientY - s.y;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 45) { setSel(addDays(selected, dx < 0 ? 7 : -7)); setSwipeOpen(null); }
+  };
+
+  const toggleTheme = () => {
+    const t = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem(LS_THEME, t);
+    setTheme(t);
+  };
 
   if (!ready) return <div className="phone"><Setup onDone={() => { setError(''); setReady(true); }} /></div>;
+  if (error) return <div className="phone"><div className="boot"><span style={{ color: 'var(--red)' }}>{error}</span></div></div>;
+  if (!data) return <div className="phone"><div className="boot">Loading…</div></div>;
 
   return (
     <div className="phone">
-      <div className="boot">
-        {error ? <span style={{ color: 'var(--red)' }}>{error}</span>
-               : data ? <span>Data layer loaded — open the console.<br />{data.exercises.length} exercises · {data.schedule.length} schedule rows</span>
-                      : <span>Loading…</span>}
+      <DayBar days={weekDays(selected)} selected={selected} today={today} dots={dots}
+              onPick={d => { setSel(d); setSwipeOpen(null); }}
+              onHome={() => { setSel(today); setSwipeOpen(null); }} />
+
+      <div className="ctx">
+        <div className="date">{fmtFull(selected)}</div>
+        {nextRace && (
+          <div className="race">
+            <span className="rn">{nextRace.name}</span>
+            <span className="rd">· {nextRace.days}d</span>
+          </div>
+        )}
       </div>
+
+      <div className="scroll" id="list" ref={listRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <NotesRow date={selected} readiness={noteState.readiness} lines={noteState.lines}
+                  onOpen={() => showToast('The Notes page arrives in step 4.', { ms: 2000 })} />
+
+        {lines.map(l => (
+          <ExerciseRow key={l.key} line={l}
+                       log={logsByEx[l.exerciseId]}
+                       last={lastBy[l.exerciseId + '|' + selected]}
+                       onToggle={() => toggleLine(l)}
+                       onOpen={() => showToast('The Exercise page arrives in step 3.', { ms: 2000 })}
+                       onRemove={() => removeLine(l)}
+                       onDragStart={onDragStart}
+                       swipeOpen={swipeOpen} setSwipeOpen={setSwipeOpen} />
+        ))}
+
+        {lines.length === 0 && (
+          <div style={{ padding: '28px 16px', color: 'var(--faint)', textAlign: 'center' }}>
+            Nothing scheduled for {dowName(selected)}.
+          </div>
+        )}
+      </div>
+
+      <Toast toast={toast} onAction={() => { if (toast && toast.onAction) toast.onAction(); }} />
+      <BottomBar raceDays={nextRace ? nextRace.days : null} onTheme={toggleTheme}
+                 inert={() => showToast('That screen arrives in step 4.', { ms: 2000 })} />
     </div>
   );
 }
