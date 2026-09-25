@@ -511,6 +511,9 @@ const patchLog = (id, fields) =>
   at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields }] } });
 const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
 
+const createExercise = (name, notes) =>
+  at(TBL.exercises, { method: 'POST', body: { records: [{ fields: notes ? { 'Name': name, 'Coaching Notes': notes } : { 'Name': name } }] } });
+
 const deleteRace = id => at(TBL.races + '/' + id, { method: 'DELETE' });
 const raceFields = r => {
   const f = { 'Name': r.name };
@@ -1269,6 +1272,191 @@ function RacePage({ race, index, total, prev, next, onBack, onGo }) {
   );
 }
 
+/* ═══════════════════════ add sheets ═══════════════════════ */
+
+// Status choices that exist on the Races table. The spec also lists "Planned",
+// which is not one of them, and writing it would be rejected.
+const RACE_STATUS = ['Registered', 'Waitlist'];
+
+function SheetShell({ title, left, right, onClose, children }) {
+  return (
+    <React.Fragment>
+      <div className="shade" style={{ display: 'block' }} onClick={onClose} />
+      <div className="sheet" style={{ display: 'block' }}>
+        <div className="sheettop">
+          <div className="back" onClick={onClose}>{left || 'Cancel'}</div>
+          <div className="st">{title}</div>
+          {right || <div style={{ width: 50 }} />}
+        </div>
+        {children}
+      </div>
+    </React.Fragment>
+  );
+}
+
+function AddToDaySheet({ date, exercises, schedule, isOverlay, onClose, onAdd, onCreate, onPlanNext, onResetWeek }) {
+  const [q, setQ] = useState('');
+  const [scope, setScope] = useState('week');
+  const [busy, setBusy] = useState(false);
+
+  const homeRow = useMemo(() => {
+    const m = {};
+    schedule.filter(r => !r.weekOf).forEach(r => r.exercises.forEach(id => {
+      if (!m[id] || (!m[id].prescription && r.prescription)) m[id] = r;
+    }));
+    return m;
+  }, [schedule]);
+
+  const needle = q.trim().toLowerCase();
+  const matches = needle
+    ? exercises.filter(e => e.name.toLowerCase().includes(needle)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 6)
+    : [];
+  const exact = matches.some(e => e.name.toLowerCase() === needle);
+  const go = fn => { if (busy) return; setBusy(true); Promise.resolve(fn()).finally(() => setBusy(false)); };
+
+  return (
+    <SheetShell title={'Add to ' + dowName(date)} onClose={onClose}>
+      <div className="grp"><div className="cell in">
+        <input className="inp" value={q} placeholder="Search exercises" autoFocus onChange={e => setQ(e.target.value)} />
+      </div></div>
+
+      {(matches.length > 0 || needle) && (
+        <div className="grp">
+          {matches.map(e => {
+            const r = homeRow[e.id];
+            return (
+              <div className="cell opt" key={e.id} onClick={() => go(() => onAdd(e, scope))}>
+                <div>
+                  <div className="v">{e.name}</div>
+                  <div className="k">{r ? [r.dow, r.prescription].filter(Boolean).join(' · ') : 'Not scheduled'}</div>
+                </div>
+                <div className="plus">+</div>
+              </div>
+            );
+          })}
+          {needle && !exact && (
+            <div className="cell opt" onClick={() => go(() => onCreate(q.trim(), scope))}>
+              <div>
+                <div className="v" style={{ color: 'var(--orange)' }}>Create “{q.trim()}”</div>
+                <div className="k">New exercise in the library</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grp"><div className="cell seg">
+        <div className="k">Apply to</div>
+        <Seg wide value={scope} onPick={v => setScope(v || 'week')}
+             options={[{ value: 'week', label: 'This week' }, { value: 'every', label: 'Every ' + dowName(date) }]} />
+      </div></div>
+
+      <div className="grp"><div className="cell opt" onClick={() => go(onPlanNext)}>
+        <div>
+          <div className="v" style={{ color: 'var(--orange)' }}>Plan next week</div>
+          <div className="k">Copy this week to {weekRange(nextMonday(date))} and open it for editing</div>
+        </div>
+        <div className="k">›</div>
+      </div></div>
+
+      {isOverlay && (
+        <div className="grp"><div className="cell opt" onClick={() => go(onResetWeek)}>
+          <div>
+            <div className="v" style={{ color: '#FF453A' }}>Reset week to template</div>
+            <div className="k">Discards this week's changes</div>
+          </div>
+          <div className="k">›</div>
+        </div></div>
+      )}
+    </SheetShell>
+  );
+}
+
+function NewExerciseSheet({ onClose, onCreate }) {
+  const [name, setName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [sched, setSched] = useState('library');
+  const [day, setDay] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const ok = name.trim() && (sched === 'library' || day);
+
+  return (
+    <SheetShell title="New Exercise" onClose={onClose}
+      right={<div className="back" style={{ fontWeight: 600, opacity: ok && !busy ? 1 : .4 }}
+                  onClick={() => { if (!ok || busy) return; setBusy(true); Promise.resolve(onCreate(name.trim(), notes.trim(), sched === 'day' ? day : null)).finally(() => setBusy(false)); }}>Add</div>}>
+      <div className="grp"><div className="cell in">
+        <input className="inp" value={name} placeholder="Exercise name" autoFocus onChange={e => setName(e.target.value)} />
+      </div></div>
+      <div className="grp"><div className="cell">
+        <div className="k">Coaching notes</div>
+        <textarea className="inp" rows="4" placeholder="Cues, progression, rules"
+                  style={{ width: '100%', resize: 'none', fontSize: 17 }}
+                  value={notes} onChange={e => setNotes(e.target.value)} />
+      </div></div>
+      <div className="grp"><div className="cell seg">
+        <div className="k">Schedule</div>
+        <Seg wide value={sched} onPick={v => setSched(v || 'library')}
+             options={[{ value: 'library', label: 'Library only' }, { value: 'day', label: 'Add to a day…' }]} />
+      </div></div>
+      {sched === 'day' && (
+        <div className="grp">
+          {DOW.slice(1).concat([DOW[0]]).map(d => (
+            <div className="cell opt" key={d} onClick={() => setDay(d)}>
+              <div className="v" style={day === d ? { color: 'var(--orange)' } : null}>Every {d}</div>
+              {day === d && <div className="k" style={{ color: 'var(--orange)' }}>✓</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </SheetShell>
+  );
+}
+
+function NewRaceSheet({ onClose, onCreate }) {
+  const [f, setF] = useState({ name: '', date: todayISO(), place: '', miles: '', elevation: '', cutoff: '', status: 'Registered', value: '' });
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setF(s => ({ ...s, [k]: v }));
+  const num = v => (v.trim() === '' ? null : Number(v));
+  const ok = f.name.trim() && f.date;
+
+  return (
+    <SheetShell title="New Race" onClose={onClose}
+      right={<div className="back" style={{ fontWeight: 600, opacity: ok && !busy ? 1 : .4 }}
+                  onClick={() => {
+                    if (!ok || busy) return;
+                    setBusy(true);
+                    Promise.resolve(onCreate({
+                      name: f.name.trim(), date: f.date, place: f.place.trim(),
+                      miles: num(f.miles), elevation: num(f.elevation), cutoff: num(f.cutoff),
+                      status: f.status, value: f.value.trim(),
+                    })).finally(() => setBusy(false));
+                  }}>Add</div>}>
+      <div className="grp">
+        <div className="cell in"><input className="inp" value={f.name} placeholder="Race name" autoFocus onChange={e => set('name', e.target.value)} /></div>
+        <div className="cell opt">
+          <div className="k">Date</div>
+          <input type="date" className="inp" style={{ flex: 'none', color: 'var(--orange)', textAlign: 'right' }}
+                 value={f.date} onChange={e => e.target.value && set('date', e.target.value)} />
+        </div>
+        <div className="cell in"><input className="inp" value={f.place} placeholder="City, State" onChange={e => set('place', e.target.value)} /></div>
+      </div>
+      <div className="grp">
+        <div className="cell in"><input className="inp" inputMode="decimal" value={f.miles} placeholder="Distance (mi)" onChange={e => set('miles', e.target.value)} /></div>
+        <div className="cell in"><input className="inp" inputMode="numeric" value={f.elevation} placeholder="Elevation gain (ft)" onChange={e => set('elevation', e.target.value)} /></div>
+        <div className="cell in"><input className="inp" inputMode="decimal" value={f.cutoff} placeholder="Cutoff (hr)" onChange={e => set('cutoff', e.target.value)} /></div>
+      </div>
+      <div className="grp"><div className="cell seg">
+        <div className="k">Status</div>
+        <Seg wide value={f.status} onPick={v => set('status', v || 'Registered')}
+             options={RACE_STATUS.map(s => ({ value: s, label: s }))} />
+      </div></div>
+      <div className="grp"><div className="cell in">
+        <input className="inp" value={f.value} placeholder="Training value (optional)" onChange={e => set('value', e.target.value)} />
+      </div></div>
+    </SheetShell>
+  );
+}
+
 /* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
@@ -1324,6 +1512,7 @@ function App() {
   const [jDate, setJDate] = useState(null);
   const [raceId, setRaceId] = useState(null);
   const [corpus, setCorpus] = useState({ logs: [], offset: undefined, more: true, loading: false, started: false });
+  const [sheet, setSheet] = useState(null);
 
   const today = todayISO();
   const daysRef  = useRef(days);  daysRef.current = days;
@@ -1541,6 +1730,114 @@ function App() {
     } catch (e) {
       if (e instanceof AuthError) { setReady(false); return; }
       showToast('Could not add ' + exercise.name + '.', { kind: 'error' });
+    }
+  };
+
+  /* ---- add an exercise to the selected day ---- */
+  const addExercise = async (exercise, scope) => {
+    const date = selected, dow = dowName(date);
+    try {
+      const home = schedRef.current.find(r => !r.weekOf && r.exercises.includes(exercise.id));
+      const rx = home ? home.prescription : '';
+      if (scope === 'every') {
+        const rows = schedRef.current.filter(r => !r.weekOf && r.dow === dow);
+        const order = (rows.length ? Math.max(...rows.map(r => r.order)) : 0) + 10;
+        const fields = { 'Day of Week': dow, 'Order': order, 'Section': 'Main Session', 'Exercise': [exercise.id] };
+        if (rx) fields['Prescription'] = rx;
+        const made = await createMany(TBL.schedule, [fields]);
+        setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+        showToast('Added ' + exercise.name + ' to every ' + dow + '.');
+      } else {
+        await ensureOverlay(date);
+        const ws = weekStartOf(date);
+        const rows = schedRef.current.filter(r => r.weekOf === ws && r.dow === dow);
+        const order = (rows.length ? Math.max(...rows.map(r => r.order)) : 0) + 10;
+        const fields = { 'Day of Week': dow, 'Week Of': ws, 'Order': order, 'Section': 'Main Session', 'Exercise': [exercise.id] };
+        if (rx) fields['Prescription'] = rx;
+        const made = await createMany(TBL.schedule, [fields]);
+        setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+        showToast('Added ' + exercise.name + '.');
+      }
+      setSheet(null);
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not add ' + exercise.name + '.', { kind: 'error' });
+    }
+  };
+
+  const createAndAdd = async (name, scope) => {
+    try {
+      const res = await createExercise(name, '');
+      const ex = shapeExercise(res.records[0]);
+      setData(d => ({ ...d, exercises: d.exercises.concat([ex]), exById: { ...d.exById, [ex.id]: ex } }));
+      await addExercise(ex, scope);
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not create “' + name + '”.', { kind: 'error' });
+    }
+  };
+
+  const createExerciseOnly = async (name, notes, day) => {
+    try {
+      const res = await createExercise(name, notes);
+      const ex = shapeExercise(res.records[0]);
+      setData(d => ({ ...d, exercises: d.exercises.concat([ex]), exById: { ...d.exById, [ex.id]: ex } }));
+      setSheet(null);
+      if (day) await addToDay(ex, day);
+      else showToast('Added ' + ex.name + ' to the library.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not create “' + name + '”.', { kind: 'error' });
+    }
+  };
+
+  const createRace = async race => {
+    try {
+      const made = await createMany(TBL.races, [raceFields(race)]);
+      setData(d => ({ ...d, races: d.races.concat(made.map(shapeRace)) }));
+      setSheet(null);
+      showToast('Added ' + race.name + '.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not add ' + race.name + '.', { kind: 'error' });
+    }
+  };
+
+  /* ---- plan next week / reset week ---- */
+  const planNextWeek = async () => {
+    const target = nextMonday(selected);
+    try {
+      const { alreadyThere, created } = await copyWeekInto(schedRef.current, selected, target);
+      if (!alreadyThere) setData(d => ({ ...d, schedule: d.schedule.concat(created) }));
+      setSheet(null);
+      setTab('today');
+      setSel(target);
+      showToast(alreadyThere ? 'Week of ' + fmtShort(target) + ' is already yours to edit.'
+                             : 'Week of ' + fmtShort(target) + ' ready to edit.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not set next week up.', { kind: 'error' });
+    }
+  };
+
+  const resetWeek = async () => {
+    const ws = weekStartOf(selected);
+    const rows = schedRef.current.filter(r => r.weekOf === ws);
+    if (!rows.length) return;
+    setSheet(null);
+    let undone = false;
+    showToast('Resetting week of ' + fmtShort(ws) + ' to the template.', {
+      ms: 10000, onUndo: () => { undone = true; hideToast(); },
+    });
+    await sleep(10000);
+    if (undone) return;
+    try {
+      await deleteMany(TBL.schedule, rows.map(r => r.id));
+      setData(d => ({ ...d, schedule: d.schedule.filter(r => r.weekOf !== ws) }));
+      showToast('Week of ' + fmtShort(ws) + ' is back on the template.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not reset that week.', { kind: 'error' });
     }
   };
 
@@ -1905,13 +2202,22 @@ function App() {
                   onBack={() => setRaceId(null)} onGo={r => setRaceId(r.id)} />
       )}
 
+      {sheet === 'today' && (
+        <AddToDaySheet date={selected} exercises={data.exercises} schedule={data.schedule}
+                       isOverlay={resolved.isOverlay}
+                       onClose={() => setSheet(null)} onAdd={addExercise} onCreate={createAndAdd}
+                       onPlanNext={planNextWeek} onResetWeek={resetWeek} />
+      )}
+      {sheet === 'exercise' && <NewExerciseSheet onClose={() => setSheet(null)} onCreate={createExerciseOnly} />}
+      {sheet === 'race' && <NewRaceSheet onClose={() => setSheet(null)} onCreate={createRace} />}
+
       <Toast toast={toast}
              onUndo={() => toast && toast.onUndo && toast.onUndo()}
              onScope={() => toast && toast.onScope && !toast.scopeDone && toast.onScope()} />
 
       <Tabs tab={tab}
             onTab={id => { setTab(id); setEditing(false); hideToast(); }}
-            onAdd={() => showToast('The Add sheets arrive in step 5.', { ms: 1800 })} />
+            onAdd={() => setSheet(tab === 'races' ? 'race' : tab === 'exercises' ? 'exercise' : 'today')} />
     </div>
   );
 }
