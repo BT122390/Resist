@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ledger — clock style mockup</title>
+<style>
+  :root{--bg:#000;--text:#FFF;--muted:#8E8E93;--dim:#48484A;--hair:#2C2C2E;--orange:#FF9F0A;--green:#30D158;--pill:#1C1C1E;--tab:rgba(28,28,30,.92);--sheet:#1C1C1E;--sheetgrp:#2C2C2E;--tgoff:#39393D;--seg:#2C2C2E;--segon:#636366;--segtext:#fff}
+  [data-theme="light"]{--bg:#F2F2F7;--text:#000;--muted:#6E6E73;--dim:#C7C7CC;--hair:#D8D8DC;--orange:#FF9500;--green:#34C759;--pill:#FFFFFF;--tab:rgba(249,249,249,.92);--sheet:#F2F2F7;--sheetgrp:#FFFFFF;--tgoff:#E9E9EB;--seg:#E9E9EB;--segon:#FFFFFF;--segtext:#000}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",sans-serif;background:#111;color:var(--text);-webkit-font-smoothing:antialiased}
+  .phone{background:var(--bg);width:100%;max-width:430px;height:100dvh;margin:0 auto;position:relative;overflow:hidden;display:flex;flex-direction:column}
+  @media (min-width:600px){ body{padding:24px 0} .phone{height:calc(100dvh - 48px);border-radius:44px;border:1px solid #333} }
+  .scroll{flex:1;overflow-y:auto;padding:0 20px calc(env(safe-area-inset-bottom) + 110px)}
+
+  .topbtns{display:flex;justify-content:flex-end;gap:10px;padding:calc(env(safe-area-inset-top) + 14px) 20px 0}
+  .pill{background:var(--pill);color:var(--text);border-radius:20px;height:38px;padding:0 16px;display:grid;place-items:center;font-size:16px;font-weight:500}
+  .pill.round{width:38px;padding:0;font-size:24px;font-weight:300}
+  .pill.on{background:var(--orange);color:#000}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.02em;padding:14px 0 2px}
+  .sub{color:var(--muted);font-size:15px;margin-bottom:6px}
+  .race{color:var(--orange);font-size:15px;font-weight:500}
+
+  .sec{font-size:17px;font-weight:600;padding:22px 0 4px;display:flex;align-items:center;gap:8px}
+  .sec .ic{font-size:15px}
+  .sec.muted{color:var(--muted);font-weight:500}
+
+  .row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--hair);gap:14px}
+  .row:last-child{border-bottom:0}
+  .row.note{margin-bottom:0}
+  .rd{color:var(--muted);font-size:15px;display:flex;align-items:center;gap:7px}
+  .rd .dot{width:10px;height:10px;border-radius:50%;background:var(--green)}
+  .big{font-size:50px;font-weight:300;letter-spacing:-.03em;line-height:1.05;white-space:nowrap}
+  .big.nm{font-size:28px;font-weight:400;letter-spacing:-.02em;white-space:normal;line-height:1.15}
+  .big small{font-size:30px;font-weight:300;margin-left:2px}
+  .row .name{font-size:15px;color:var(--text);margin-top:2px}
+  .row .name span{color:var(--muted)}
+  .row .name{font-size:15px}
+  .row.done .big,.row.done .name{color:var(--muted)}
+  .row.done .big{font-weight:200}
+  .row.text .big{font-size:26px;font-weight:400;letter-spacing:-.01em;white-space:normal;line-height:1.2}
+
+  /* toggle */
+  .tg{width:51px;height:31px;border-radius:16px;background:var(--tgoff);position:relative;flex:none;transition:background .2s}
+  .tg i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+  .done .tg{background:var(--green)} .done .tg i{left:22px}
+  .haslog:not(.done) .tg i:after{content:"";position:absolute;left:10px;top:10px;width:7px;height:7px;border-radius:50%;background:var(--orange)}
+
+  .change{background:#3A2A0F;color:var(--orange);font-size:12px;font-weight:700;letter-spacing:.06em;border-radius:14px;padding:6px 12px;flex:none}
+
+  /* notes */
+
+  /* edit mode */
+  .edit .row{padding-left:0}
+  .edit .del{display:grid}
+  .del{display:none;width:22px;height:22px;border-radius:50%;background:#FF453A;color:#fff;place-items:center;font-size:20px;line-height:0;flex:none;margin-right:6px}
+  .edit .tg{display:none}
+  .grip{display:none;color:var(--dim);font-size:22px;flex:none}
+  .edit .grip{display:block}
+  .edit .chev{display:block;color:var(--dim);margin-left:8px}
+  .chev{display:none}
+
+
+
+
+  .screen{display:none;flex:1;flex-direction:column;min-height:0}
+  .screen.on{display:flex}
+  .rr .name{margin-top:3px}
+  .rr .name span{font-size:14px}
+  #s-j .name{margin-top:0}
+  #s-j .name span{font-size:15px}
+  .days{font-size:26px;font-weight:300;color:var(--muted);flex:none;letter-spacing:-.02em;margin-left:12px}
+  .days small{font-size:14px;margin-left:1px}
+  .days.on{color:var(--orange)}
+  .days.a{color:var(--text)}
+  .rr.done .big{color:var(--muted)}
+  .rr.done .days{color:var(--green);font-size:22px}
+
+
+  .daynav{display:flex;align-items:center;justify-content:space-between}
+  .arrows{display:flex;gap:6px;padding-top:12px}
+  .arrows span{width:36px;height:36px;border-radius:50%;background:var(--pill);color:var(--orange);display:grid;place-items:center;font-size:24px;line-height:0;padding-bottom:3px}
+  .toast{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 84px);background:#2C2C2E;color:#fff;border-radius:14px;padding:12px 16px;font-size:15px;display:none;justify-content:space-between;align-items:center;z-index:15;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .toast.on{display:flex}
+  .tacts{display:flex;gap:16px;align-items:center}
+  .tacts b{color:var(--orange);font-weight:600}
+  .tacts i{font-style:normal;color:var(--muted);font-size:14px}
+  .tacts i.on{color:#fff}
+
+  /* swipe + drag */
+  .sw{position:relative;overflow:hidden}
+  .sw .row{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+  .sw .del2{position:absolute;right:0;top:0;bottom:0;width:90px;background:#FF453A;color:#fff;font-weight:600;display:grid;place-items:center;font-size:16px}
+  .sw.lift .row{background:var(--pill);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);z-index:5;transform:scale(1.02)}
+  .sw.gap-top{border-top:2px solid var(--orange)}
+  .sw.gap-bot{border-bottom:2px solid var(--orange)}
+  .tab.add{color:var(--orange)}
+  .shade{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:20}
+  .sheet{display:none;position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:18px 18px 0 0;padding:0 16px calc(env(safe-area-inset-bottom) + 16px);z-index:21;max-height:80%;overflow-y:auto}
+  .sheet .grp{background:var(--sheetgrp)}
+  .sheet .cell{border-color:var(--hair)}
+  .open-add .shade{display:block}
+  .open-add.on-today #exsheet{display:block}
+  .open-add.on-races #racesheet{display:block}
+  .open-add.on-lib #newexsheet{display:block}
+  .sheettop{display:flex;align-items:center;justify-content:space-between;padding:14px 0 2px}
+  .sheettop .back{color:var(--orange);font-size:17px}
+  .sheettop .st{font-weight:600;font-size:17px}
+  .cell.opt{display:flex;align-items:center;justify-content:space-between}
+  .cell.opt .k{margin:1px 0 0}
+  #rp .cell.opt .k{font-size:15px;color:var(--muted)}
+  #rp .cell.opt .v{font-size:17px}
+  .plus{width:30px;height:30px;border-radius:50%;background:var(--seg);color:var(--orange);display:grid;place-items:center;font-size:22px;line-height:0}
+
+  /* exercise page */
+  .pg{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
+  .pg.on{display:flex;transform:translateX(0)}
+  .pgtop{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 14px) 20px 0}
+  .pgtop .back{color:var(--orange);font-size:17px}
+  .pgtop .pos{color:var(--muted);font-size:14px}
+  .grp{background:var(--pill);border-radius:14px;margin-top:16px;overflow:hidden}
+  .cell{padding:12px 16px;border-bottom:1px solid var(--hair)}
+  .cell:last-child{border-bottom:0}
+  .k{color:var(--muted);font-size:13px;font-weight:500;letter-spacing:.02em;margin-bottom:3px}
+  .v{font-size:17px;line-height:1.4}
+  .v.muted{color:var(--muted);font-size:15px;margin-top:8px}
+  .cell.in{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 16px}
+  .inp{flex:1;background:transparent;border:0;color:var(--text);font:inherit;font-size:19px;outline:none;min-width:0}
+  .inp::placeholder{color:var(--dim)}
+  .save{background:var(--orange);color:#000;font-weight:600;border-radius:18px;padding:8px 16px;font-size:15px}
+  .cell.chips{display:flex;gap:8px;flex-wrap:wrap}
+  .cell.chips span{border:1px solid var(--hair);border-radius:16px;padding:6px 12px;font-size:14px;color:var(--text)}
+  .cell.seg{display:flex;align-items:center;justify-content:space-between}
+  .cell.seg .k{margin:0;font-size:15px;color:var(--text)}
+  .segc{display:flex;background:var(--seg);border-radius:9px;padding:2px}
+  .segc span{width:40px;text-align:center;padding:5px 0;border-radius:7px;font-size:14px;color:var(--muted)}
+  .segc span.on{background:var(--segon);color:var(--segtext)}
+  .segc.rdy span{width:64px}
+  .segc.rdy .g.on{background:var(--green);color:#000}.segc.rdy .y.on{background:var(--orange);color:#000}.segc.rdy .r.on{background:#FF453A;color:#fff}
+  .h{display:flex;gap:12px;font-size:16px;padding:7px 0;border-top:1px solid var(--hair)}
+  .h:first-of-type{border-top:0}
+  .h span{color:var(--muted);width:56px;flex:none;font-size:14px;padding-top:2px}
+  .more{color:var(--orange);font-size:15px;padding:10px 0 2px}
+  .nav{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 12px);background:var(--tab);backdrop-filter:blur(20px);border-radius:32px;display:flex;justify-content:space-between;padding:16px 22px;border:1px solid var(--hair);font-size:16px;color:var(--orange)}
+
+  /* tab bar */
+  .tabs{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 12px);background:var(--tab);backdrop-filter:blur(20px);border-radius:32px;display:flex;padding:8px 6px;border:1px solid var(--hair)}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:10px;font-weight:500;padding:6px 0;border-radius:24px}
+  .tab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6}
+  .tab.on{color:var(--orange);background:#3A2A0F}
+
+  /* week strip (in the Sleep | Wake Up slot) */
+  .week{display:flex;justify-content:space-between;padding:10px 0 4px}
+  .week div{text-align:center;color:var(--muted);font-size:12px;width:40px}
+  .week b{display:block;font-size:20px;font-weight:400;color:var(--text);margin-top:2px}
+  .week .on b{color:var(--orange)}
+  .week .on{color:var(--orange)}
+</style>
+</head>
+<body>
+<div class="phone" id="phone" data-theme="dark">
+  <div class="screen on" id="s-today">
+  <div class="topbtns"><div class="pill round" onclick="theme()" style="font-size:18px" title="Theme">◐</div><div class="pill" id="editbtn" onclick="edit()">Edit</div></div>
+  <div class="scroll">
+    <div class="daynav"><h1 id="dayttl">Wednesday</h1><div class="arrows"><span onclick="day(-1)">‹</span><span onclick="day(1)">›</span></div></div>
+    <div class="sub" id="daysub">September 23 · <span class="race">Moab 240 in 10 days</span></div>
+
+
+    <div class="row note" onclick="npage(true)"><div class="big nm">Notes</div><div class="rd"><span class="dot"></span>Green · 2</div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row done" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Loaded Tibialis Anterior Raise</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+    <div class="sw"><div class="del2">Delete</div><div class="row done" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Kneeling Hip Flexor Stretch</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Med Ball Rotational Throws</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Backward Sled Drags</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Sled Pushes</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Slant Board Squats</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Concept2 RowErg Intervals</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">SkiErg Sprint Intervals</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Farmer's Carry</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">Weighted Pull-Ups</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+
+    <div class="sw"><div class="del2">Delete</div><div class="row" onclick="page(true)"><div class="del">–</div><div style="flex:1"><div class="big nm">SkiErg Metabolic Mind</div></div><div class="tg" onclick="tog(event,this)"><i></i></div><span class="grip">☰</span></div></div>
+  </div>
+
+
+
+  </div>
+
+  <!-- ============ RACES ============ -->
+  <div class="screen" id="s-races">
+    <div class="topbtns"></div>
+    <div class="scroll">
+      <h1>Races</h1>
+      <div class="sub">9 upcoming · <span class="race">Sedona Canyons 125 in 220 days</span></div>
+
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Moab 240</div><div class="days on">10<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Spartan Dallas Ultrafecta</div><div class="days">24<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Spartan Carolinas Ultrafecta</div><div class="days">59<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Isle Du Bois 50K</div><div class="days">74<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Spartan Florida Trifecta</div><div class="days">87<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Spartan SoCal Trifecta</div><div class="days">122<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Oklahoma Outlaw 100</div><div class="days">142<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Spartan Atlanta Trifecta</div><div class="days">171<small>d</small></div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr" onclick="rpage(true)"><div class="big nm">Sedona Canyons 125</div><div class="days a">220<small>d</small></div></div></div>
+
+      <div class="sw"><div class="del2">Delete</div><div class="row rr done" onclick="rpage(true)"><div class="big nm">High Hope 200k</div><div class="days">✓</div></div></div>
+      <div class="sw"><div class="del2">Delete</div><div class="row rr done" onclick="rpage(true)"><div class="big nm">Oklahoma Outlaw</div><div class="days">✓</div></div></div>
+    </div>
+  </div>
+
+
+
+  <!-- ============ EXERCISES ============ -->
+  <div class="screen" id="s-ex">
+    <div class="topbtns"></div>
+    <div class="scroll">
+      <h1>Exercises</h1>
+      <div class="sub">65 in the library · 24 shown</div>
+      <div class="grp" style="margin:6px 0 4px"><div class="cell in"><input class="inp" placeholder="Search" style="font-size:17px"></div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Backward Sled Drags</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Banded Peroneal Strengthening</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Box Squat</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Bulgarian Split Squat</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Calf Endurance Sets</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Concept2 RowErg Intervals</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Dead Hang Progression</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">GHD Back Extensions</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">GHD Glute-Ham Raise</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">GHD Sorenson Hold</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">HIITMill Farmer's Carry Intervals</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Kneeling Hip Flexor Stretch</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Loaded Tibialis Anterior Raise</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Long Ruck with Power Bursts</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Med Ball Rotational Throws</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Peterson Step-Downs</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Power Clean</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Rope Pulls</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Single-Leg RDL on BOSU</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Slant Board Squats</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Staircase Chase</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Weighted Pull-Ups</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Weighted Step-Ups</div></div>
+      <div class="row rr" onclick="lpage(true)"><div class="big nm">Weighted Step-Down Negatives</div></div>
+    </div>
+  </div>
+
+
+
+  <!-- ============ JOURNAL ============ -->
+  <div class="screen" id="s-j">
+    <div class="topbtns"></div>
+    <div class="scroll">
+      <h1>Journal</h1>
+      <div class="sub">312 logs · 19 this week</div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Today</div><div class="name"><span>Wednesday, Sep 23</span></div></div><div class="days on">2</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Tuesday</div><div class="name"><span>Sep 22</span></div></div><div class="days">7</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Monday</div><div class="name"><span>Sep 21</span></div></div><div class="days">11</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Saturday</div><div class="name"><span>Sep 19</span></div></div><div class="days">5</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Friday</div><div class="name"><span>Sep 18</span></div></div><div class="days">4</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Thursday</div><div class="name"><span>Sep 17</span></div></div><div class="days">5</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Tuesday</div><div class="name"><span>Sep 15</span></div></div><div class="days">7</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Monday</div><div class="name"><span>Sep 14</span></div></div><div class="days">12</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Sunday</div><div class="name"><span>Sep 13</span></div></div><div class="days">9</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Saturday</div><div class="name"><span>Sep 12</span></div></div><div class="days">6</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Friday</div><div class="name"><span>Sep 11</span></div></div><div class="days">4</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Thursday</div><div class="name"><span>Sep 10</span></div></div><div class="days">5</div></div>
+      <div class="row rr" onclick="jpage(true)"><div><div class="big nm">Wednesday</div><div class="name"><span>Sep 9</span></div></div><div class="days">10</div></div>
+    </div>
+  </div>
+
+
+  <!-- ============ JOURNAL DAY PAGE ============ -->
+  <div class="pg" id="jp">
+    <div class="pgtop"><div class="back" onclick="jpage(false)">‹ Journal</div><div class="pos">Sep 22</div><div class="back" style="font-size:15px" onclick="jpage(false);tab(document.querySelector('[data-s=s-today]'))">Open day</div></div>
+    <div class="scroll">
+      <h1 style="font-size:30px;padding-top:6px">Tuesday</h1>
+      <div class="sub">September 22 · 7 logged · <span style="color:var(--green)">Readiness Green</span></div>
+      <div class="grp">
+        <div class="cell"><div class="k">Notes</div><div class="v">PB&amp;J on HIITMill — GI fine. Approve for race list.</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Loaded Tibialis Anterior Raise</div><div class="v">2×10 @ 10 lb</div></div>
+        <div class="cell"><div class="k">Incline Treadmill Warm-Up</div><div class="v">20 min @ 25%, 2.8 mph, nasal held</div></div>
+        <div class="cell"><div class="k">Weighted Step-Ups</div><div class="v">4×10 @ 35 lb KB, 16" · RPE 8</div></div>
+        <div class="cell"><div class="k">Weighted Step-Down Negatives</div><div class="v">3×8 @ 20 lb + 3s hold · <span style="color:var(--orange)">pain 1</span></div></div>
+        <div class="cell"><div class="k">GHD Glute-Ham Raise</div><div class="v">3×8 @ 15 lb</div></div>
+        <div class="cell"><div class="k">Single-Leg Box Landings</div><div class="v muted" style="margin:0">Skipped — out of time</div></div>
+        <div class="cell"><div class="k">HIITMill Farmer's Carry Intervals</div><div class="v">40 min 3/1 @ 45 lb/side. PB&amp;J — GI fine.</div></div>
+      </div>
+    </div>
+    <div class="nav"><div>‹ Mon, Sep 21</div><div>Wed, Sep 23 ›</div></div>
+  </div>
+
+  <!-- ============ LIBRARY EXERCISE PAGE ============ -->
+  <div class="pg" id="lp">
+    <div class="pgtop"><div class="back" onclick="lpage(false)">‹ Exercises</div><div class="pos">20 of 65</div><div style="width:60px"></div></div>
+    <div class="scroll">
+      <h1 style="font-size:30px;padding-top:6px">Slant Board Squats</h1>
+      <div class="sub">Wednesday · Block A · paired with Concept2 RowErg Intervals</div>
+      <div class="grp">
+        <div class="cell"><div class="k">Prescription</div><div class="v">4 rounds @ weighted vest 10–15 lb, one set per round alternating with RowErg</div></div>
+        <div class="cell"><div class="k">Last result · Sep 16</div><div class="v">4×12 @ 15 lb vest, full depth</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Coaching notes</div><div class="v">Heels elevated on the slant board, ankle locked in dorsiflexion — the plan's most direct simulation of steep-descent quad loading. Full depth, 3s descent, brief pause without relaxing, then drive up.</div><div class="v muted">P2 W1–6: 4×12 @ vest 10–15 lb. P2 W7–12: 4×15 @ vest 15–20 lb. P3: 4×12 @ vest 20–25 lb, or add a 2–3s pause once vest weight plateaus. Never increase load and add a pause in the same week. If knee pain develops, reduce the slant angle before reducing load.</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">History</div>
+          <div class="h"><span>Sep 16</span>4×12 @ 15 lb vest, full depth</div>
+          <div class="h"><span>Sep 9</span>4×12 @ 15 lb vest</div>
+          <div class="h"><span>Sep 2</span>4×12 @ 10 lb vest</div>
+          <div class="h"><span>Aug 26</span>4×12 @ 10 lb vest — first weighted</div>
+          <div class="h"><span>Aug 19</span>4×15 BW</div>
+          <div class="more">Show all 14</div>
+        </div>
+      </div>
+      <div class="grp"><div class="cell opt" onclick="addSheet(true)"><div class="v" style="color:var(--orange)">Add to a day</div><div class="k">›</div></div></div>
+    </div>
+    <div class="nav"><div>‹ Single-Leg RDL on BOSU</div><div>Staircase Chase ›</div></div>
+  </div>
+
+  <!-- ============ RACE PAGE ============ -->
+  <div class="pg" id="rp">
+    <div class="pgtop"><div class="back" onclick="rpage(false)">‹ Races</div><div class="pos">1 of 9</div><div style="width:60px"></div></div>
+    <div class="scroll">
+      <h1 style="font-size:30px;padding-top:6px">Moab 240</h1>
+      <div class="sub"><span class="race">10 days</span> · Saturday, October 3, 2026</div>
+      <div class="grp">
+        <div class="cell opt"><div class="k">Location</div><div class="v">Moab, UT</div></div>
+        <div class="cell opt"><div class="k">Distance</div><div class="v">240 mi · 40,000 ft</div></div>
+        <div class="cell opt"><div class="k">Cutoff</div><div class="v">115 hr</div></div>
+        <div class="cell opt"><div class="k">Status</div><div class="v" style="color:var(--orange)">Waitlist</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Training value</div><div class="v">If confirmed, replaces Phase 1 closer. Spartan Dallas drops; Moab recovery becomes the Phase 1 recovery block.</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Plan</div><div class="v">Cold exposure is the real DNF risk, not heat — overnight lows in the 30s–40s°F, possible snow at elevation. Cold-layer system rehearsed Sep 19: merino base, Alpha fleece, shell, swap at 2am.</div><div class="v muted">Taper begins Sep 21. Travel Thursday Oct 1. Pre-tape forefoot. Poles from the start.</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Countdown</div>
+          <div class="h"><span>Sep 26</span>Last long ruck — 8 hr @ 25–30 lb</div>
+          <div class="h"><span>Sep 30</span>Full gear audit, drop bags packed</div>
+          <div class="h"><span>Oct 1</span>Travel</div>
+          <div class="h"><span>Oct 2</span>Check-in, shakeout only</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav"><div style="color:var(--dim)">‹</div><div>Spartan Dallas Ultrafecta ›</div></div>
+  </div>
+
+  <!-- ============ NOTES PAGE ============ -->
+  <div class="pg" id="np">
+    <div class="pgtop"><div class="back" onclick="npage(false)">‹ Wednesday</div><div class="pos">Sep 23</div><div style="width:60px"></div></div>
+    <div class="scroll">
+      <h1 style="font-size:30px;padding-top:6px">Notes</h1>
+      <div class="grp">
+        <div class="cell seg"><div class="k">Readiness</div><div class="segc rdy"><span class="g on">Green</span><span class="y">Yellow</span><span class="r">Red</span></div></div>
+      </div>
+      <div class="grp">
+        <div class="cell in"><input class="inp" placeholder="Add a note"><div class="save">Add</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="h"><span>6:12 AM</span>Cold plunge 3 min post-session — legs still heavy from Saturday</div><div class="h"><span>5:40 AM</span>Pack list for Moab travel started</div></div>
+      </div>
+      <div class="grp">
+        <div class="cell"><div class="k">Earlier this week</div>
+          <div class="h"><span>Tue</span>PB&amp;J on HIITMill — GI fine. Approve for race list.</div>
+          <div class="h"><span>Mon</span>Box squat 245 felt like RPE 7. Hold load next week.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EXERCISE PAGE ============ -->
+  <div class="pg" id="pg">
+    <div class="pgtop"><div class="back" onclick="page(false)">‹ Wednesday</div><div class="pos">6 of 11</div><div class="pill" style="height:34px;padding:0 14px;font-size:15px">Skip</div></div>
+    <div class="scroll">
+      <h1 style="font-size:30px;padding-top:6px">Slant Board Squats</h1>
+      <div class="sub">Block A · paired with Concept2 RowErg Intervals</div>
+
+      <div class="grp">
+        <div class="cell"><div class="k">Prescription</div><div class="v">4 rounds @ weighted vest 10–15 lb, one set per round alternating with RowErg</div></div>
+        <div class="cell"><div class="k">Last result · Sep 16</div><div class="v">4×12 @ 15 lb vest, full depth</div></div>
+      </div>
+
+      <div class="grp">
+        <div class="cell in"><input class="inp" placeholder="Result"><div class="save">Save</div></div>
+        <div class="cell chips"><span>4×12 @ 15 lb vest</span><span>4×12 @ 20 lb vest</span><span>Skipped</span></div>
+        <div class="cell in"><input class="inp" placeholder="Note" style="font-size:16px;color:var(--muted)"></div>
+        <div class="cell seg"><div class="k">Pain</div><div class="segc"><span class="on">0</span><span>1</span><span>2</span><span>3</span></div></div>
+        <div class="cell seg"><div class="k">RPE</div><div class="segc"><span>6</span><span>7</span><span class="on">8</span><span>9</span><span>10</span></div></div>
+      </div>
+
+      <div class="grp">
+        <div class="cell"><div class="k">Coaching notes</div><div class="v">Heels elevated on the slant board, ankle locked in dorsiflexion — the plan's most direct simulation of steep-descent quad loading. Full depth, 3s descent, brief pause without relaxing, then drive up.</div><div class="v muted">P2 W1–6: 4×12 @ vest 10–15 lb. P2 W7–12: 4×15 @ vest 15–20 lb. P3: 4×12 @ vest 20–25 lb, or add a 2–3s pause once vest weight plateaus. Never increase load and add a pause in the same week. If knee pain develops, reduce the slant angle before reducing load.</div></div>
+      </div>
+
+      <div class="grp">
+        <div class="cell"><div class="k">History</div>
+          <div class="h"><span>Sep 16</span>4×12 @ 15 lb vest, full depth</div>
+          <div class="h"><span>Sep 9</span>4×12 @ 15 lb vest</div>
+          <div class="h"><span>Sep 2</span>4×12 @ 10 lb vest</div>
+          <div class="h"><span>Aug 26</span>4×12 @ 10 lb vest — first weighted</div>
+          <div class="h"><span>Aug 19</span>4×15 BW</div>
+          <div class="more">Show all 14</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav"><div onclick="page(false)">‹ Sled Pushes</div><div>Concept2 RowErg ›</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab on" data-s="s-today" onclick="tab(this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>Today</div>
+    <div class="tab" data-s="s-ex" onclick="tab(this)"><svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12"/></svg>Exercises</div>
+    <div class="tab" data-s="s-j" onclick="tab(this)"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Journal</div>
+    <div class="tab" data-s="s-races" onclick="tab(this)"><svg viewBox="0 0 24 24"><path d="M5 3v18M5 4h11l-2 3 2 3H5"/></svg>Races</div>
+    <div class="tab add" onclick="addSheet(true)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</div>
+  </div>
+  <div class="toast" id="toast"><span id="toastmsg">Removed</span><div class="tacts"><b onclick="undo()">Undo</b><i onclick="scopeAll()">Every Wed</i></div></div>
+  <div class="shade" onclick="addSheet(false)"></div>
+
+  <div class="sheet" id="racesheet">
+    <div class="sheettop"><div class="back" onclick="addSheet(false)">Cancel</div><div class="st">New Race</div><div class="back" style="font-weight:600">Add</div></div>
+    <div class="grp">
+      <div class="cell in"><input class="inp" placeholder="Race name"></div>
+      <div class="cell opt"><div class="k">Date</div><div class="v" style="color:var(--orange)">Sat, Sep 26, 2026</div></div>
+      <div class="cell in"><input class="inp" placeholder="City, State"></div>
+    </div>
+    <div class="grp">
+      <div class="cell in"><input class="inp" placeholder="Distance (mi)" inputmode="decimal"></div>
+      <div class="cell in"><input class="inp" placeholder="Elevation gain (ft)" inputmode="numeric"></div>
+      <div class="cell in"><input class="inp" placeholder="Cutoff (hr)" inputmode="decimal"></div>
+    </div>
+    <div class="grp">
+      <div class="cell seg"><div class="k">Status</div><div class="segc"><span class="on" style="width:auto;padding:5px 12px">Registered</span><span style="width:auto;padding:5px 12px">Waitlist</span><span style="width:auto;padding:5px 12px">Planned</span></div></div>
+    </div>
+    <div class="grp">
+      <div class="cell in"><input class="inp" placeholder="Training value (optional)"></div>
+    </div>
+  </div>
+
+
+  <div class="sheet" id="newexsheet">
+    <div class="sheettop"><div class="back" onclick="addSheet(false)">Cancel</div><div class="st">New Exercise</div><div class="back" style="font-weight:600">Add</div></div>
+    <div class="grp">
+      <div class="cell in"><input class="inp" placeholder="Exercise name"></div>
+    </div>
+    <div class="grp">
+      <div class="cell"><div class="k">Coaching notes</div><textarea class="inp" rows="4" placeholder="Cues, progression, rules" style="width:100%;resize:none;font-size:17px"></textarea></div>
+    </div>
+    <div class="grp">
+      <div class="cell seg"><div class="k">Schedule</div><div class="segc"><span class="on" style="width:auto;padding:5px 12px">Library only</span><span style="width:auto;padding:5px 12px">Add to a day…</span></div></div>
+    </div>
+  </div>
+
+  <div class="sheet" id="exsheet">
+    <div class="sheettop"><div class="back" onclick="addSheet(false)">Cancel</div><div class="st">Add to Wednesday</div><div style="width:50px"></div></div>
+    <div class="grp"><div class="cell in"><input class="inp" placeholder="Search exercises" value="step"></div></div>
+    <div class="grp">
+      <div class="cell opt"><div><div class="v">Weighted Step-Ups</div><div class="k">Tuesday · 4×10 each side</div></div><div class="plus">+</div></div>
+      <div class="cell opt"><div><div class="v">Weighted Step-Down Negatives</div><div class="k">Tuesday · 3×8 + 3s hold</div></div><div class="plus">+</div></div>
+      <div class="cell opt"><div><div class="v">Peterson Step-Downs</div><div class="k">Monday · 3×10 @ 10–15 lb/hand</div></div><div class="plus">+</div></div>
+      <div class="cell opt"><div><div class="v" style="color:var(--orange)">Create “step”</div><div class="k">New exercise in the library</div></div></div>
+    </div>
+    <div class="grp"><div class="cell seg"><div class="k">Apply to</div><div class="segc"><span class="on" style="width:auto;padding:5px 12px">This week</span><span style="width:auto;padding:5px 12px">Every Wednesday</span></div></div></div>
+    <div class="grp"><div class="cell opt"><div><div class="v" style="color:var(--orange)">Plan next week</div><div class="k">Copy this week to Sep 28 – Oct 4 and open it for editing</div></div><div class="k">›</div></div></div>
+  </div>
+</div>
+<script>
+  function tog(ev,el){ ev.stopPropagation(); if(document.getElementById('phone').classList.contains('edit')) return; el.closest('.row').classList.toggle('done'); }
+
+  function addSheet(o){ const p=document.getElementById('phone'); const races=document.getElementById('s-races').classList.contains('on'); const lib=document.getElementById('s-ex').classList.contains('on') && !document.getElementById('lp').classList.contains('on'); p.classList.toggle('on-races', races); p.classList.toggle('on-lib', lib); p.classList.toggle('on-today', !races && !lib); p.classList.toggle('open-add', o); }
+  // swipe-left to delete, long-press to drag
+  (function(){
+    let sx=0, sy=0, lx=0, cur=null, moved=false, axis=null, timer=null, dragging=null;
+    document.querySelectorAll('.sw .row').forEach(r=>{
+      r.addEventListener('pointerdown', e=>{
+        if(e.target.closest('.tg')||document.getElementById('phone').classList.contains('edit')) return;
+        sx=lx=e.clientX; sy=e.clientY; cur=r; moved=false; axis=null;
+        timer=setTimeout(()=>{ if(axis) return; dragging=r.parentElement; dragging.classList.add('lift'); if(navigator.vibrate) navigator.vibrate(10); }, 400);
+      });
+      r.addEventListener('pointermove', e=>{
+        if(cur!==r) return;
+        lx=e.clientX;
+        const dx=e.clientX-sx, dy=e.clientY-sy;
+        if(dragging){
+          const items=[...document.querySelectorAll('.sw')].filter(x=>x!==dragging);
+          items.forEach(x=>x.classList.remove('gap-top','gap-bot'));
+          let target=null, before=true;
+          for(const it of items){ const b=it.getBoundingClientRect(); if(e.clientY<b.top+b.height/2){ target=it; before=true; break; } target=it; before=false; }
+          if(target){ target.classList.add(before?'gap-top':'gap-bot'); dragging._t=target; dragging._b=before; }
+          return;
+        }
+        if(!axis && (Math.abs(dx)>12||Math.abs(dy)>12)){ axis = Math.abs(dx)>Math.abs(dy)*1.5 ? 'x' : 'y'; clearTimeout(timer); }
+        if(axis!=='x') return;
+        moved=true; r.style.transition='none'; r.style.transform=`translateX(${Math.min(0,Math.max(dx,-100))}px)`;
+      });
+      const finish=()=>{
+        clearTimeout(timer);
+        if(cur!==r) return;
+        if(dragging){ if(dragging._t){ dragging._b?dragging._t.before(dragging):dragging._t.after(dragging); } document.querySelectorAll('.sw').forEach(x=>x.classList.remove('gap-top','gap-bot','lift')); dragging=null; cur=null; moved=true; setTimeout(()=>moved=false,50); return; }
+        r.style.transition='';
+        const dx = axis==='x' ? lx-sx : 0;
+        if(dx<-150){ r.style.transform='translateX(-100%)'; const sw=r.parentElement; setTimeout(()=>{ toast(sw); sw.remove(); },180); }
+        else if(dx<-60){ r.style.transform='translateX(-90px)'; }
+        else { r.style.transform=''; }
+        cur=null; axis=null;
+      };
+      r.addEventListener('pointerup', finish);
+      r.addEventListener('pointercancel', ()=>{ clearTimeout(timer); if(dragging){ document.querySelectorAll('.sw').forEach(x=>x.classList.remove('gap-top','gap-bot','lift')); dragging=null; } if(cur===r){ r.style.transition=''; r.style.transform=''; } cur=null; axis=null; });
+      r.addEventListener('click', e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); moved=false; } }, true);
+    });
+    document.querySelectorAll('.del2').forEach(d=>d.addEventListener('click', ()=>{ const sw=d.parentElement; sw.querySelector('.row').style.transform='translateX(-100%)'; setTimeout(()=>{ toast(sw); sw.remove(); },180); }));
+  })();
+
+  // --- day navigation (mock: cycles labels)
+  const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let dayIdx=3, dayNum=23;
+  function day(d){ dayIdx=(dayIdx+d+7)%7; dayNum+=d; document.getElementById('dayttl').textContent=dayNames[dayIdx]; document.getElementById('daysub').innerHTML=`September ${dayNum} · <span class="race">Moab 240 in ${10-(dayNum-23)} days</span>`; }
+  (function(){ let sx=0,sy=0,armed=false; const sc=document.querySelector('#s-today .scroll');
+    sc.addEventListener('pointerdown',e=>{ if(e.target.closest('.row')) return; sx=e.clientX; sy=e.clientY; armed=true; });
+    sc.addEventListener('pointerup',e=>{ if(!armed) return; armed=false; const dx=e.clientX-sx, dy=e.clientY-sy; if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)*2) day(dx<0?1:-1); });
+  })();
+  // --- undo toast
+  let removed=null, tHandle=null;
+  function toast(sw){ removed={sw, next: sw.nextElementSibling, parent: sw.parentElement}; const name=sw.querySelector('.big').textContent; document.getElementById('toastmsg').textContent='Removed '+name; const t=document.getElementById('toast'); t.classList.add('on'); t.querySelector('.tacts i').classList.remove('on'); t.querySelector('.tacts i').style.display = sw.closest('#s-today')?'block':'none'; clearTimeout(tHandle); tHandle=setTimeout(()=>{t.classList.remove('on'); removed=null;},5000); }
+  function undo(){ if(!removed) return; const r=removed.sw.querySelector('.row'); r.style.transform=''; removed.next ? removed.next.before(removed.sw) : removed.parent.appendChild(removed.sw); removed=null; document.getElementById('toast').classList.remove('on'); }
+  function scopeAll(){ const i=document.querySelector('.tacts i'); i.classList.add('on'); i.textContent='Every Wed ✓'; document.getElementById('toastmsg').textContent += ' from every Wednesday'; }
+
+  function theme(){ const p=document.getElementById('phone'); p.dataset.theme = p.dataset.theme==='light'?'dark':'light'; }
+  function tab(el){ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on')); el.classList.add('on'); document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===el.dataset.s)); }
+  function jpage(o){ document.getElementById('jp').classList.toggle('on', o); }
+  function lpage(o){ document.getElementById('lp').classList.toggle('on', o); }
+  function rpage(o){ document.getElementById('rp').classList.toggle('on', o); }
+  function npage(o){ if(document.getElementById('phone').classList.contains('edit')) return; document.getElementById('np').classList.toggle('on', o); }
+  function page(o){ if(document.getElementById('phone').classList.contains('edit')) return; document.getElementById('pg').classList.toggle('on', o); }
+  function edit(){ const p=document.getElementById('phone'); p.classList.toggle('edit'); document.getElementById('editbtn').textContent = p.classList.contains('edit')?'Done':'Edit'; }
+</script>
+</body>
+</html>
