@@ -511,6 +511,20 @@ const patchLog = (id, fields) =>
   at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields }] } });
 const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
 
+const deleteRace = id => at(TBL.races + '/' + id, { method: 'DELETE' });
+const raceFields = r => {
+  const f = { 'Name': r.name };
+  if (r.date) f['Date'] = r.date;
+  if (r.place) f['City/State'] = r.place;
+  if (r.miles != null) f[F.miles] = r.miles;
+  if (r.elevation != null) f[F.elevation] = r.elevation;
+  if (r.cutoff != null) f[F.cutoff] = r.cutoff;
+  if (r.status) f['Status'] = r.status;
+  if (r.type) f[F.raceType] = r.type;
+  if (r.value) f['Training Value'] = r.value;
+  return f;
+};
+
 const createNote = (date, notes) =>
   at(TBL.dayNotes, { method: 'POST', body: { records: [{ fields: { 'Date': date, 'Notes': notes } }] } });
 const updateNote = (id, notes) =>
@@ -951,6 +965,310 @@ function NotesPage({ date, readiness, lines, times, weekLines, onBack, onReadine
   );
 }
 
+/* ═══════════════════════ exercises tab ═══════════════════════ */
+
+function ExercisesTab({ exercises, schedule, query, setQuery, onOpen }) {
+  const scheduled = useMemo(() => {
+    const s = new Set();
+    schedule.forEach(r => r.exercises.forEach(id => s.add(id)));
+    return s;
+  }, [schedule]);
+
+  const needle = query.trim().toLowerCase();
+  const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
+  const match = e => !needle || e.name.toLowerCase().includes(needle);
+  const live = sorted.filter(e => scheduled.has(e.id) && match(e));
+  const archived = sorted.filter(e => !scheduled.has(e.id) && match(e));
+
+  return (
+    <React.Fragment>
+      <h1>Exercises</h1>
+      <div className="sub">{exercises.length} in the library · {live.length + archived.length} shown</div>
+      <div className="grp" style={{ margin: '6px 0 4px' }}>
+        <div className="cell in">
+          <input className="inp" style={{ fontSize: 17 }} value={query} placeholder="Search" onChange={e => setQuery(e.target.value)} />
+          {query && <div className="save" style={{ background: 'var(--seg)', color: 'var(--muted)' }} onClick={() => setQuery('')}>Clear</div>}
+        </div>
+      </div>
+      {live.map(e => (
+        <div className="row rr" key={e.id} onClick={() => onOpen(e)}><div className="big nm">{e.name}</div></div>
+      ))}
+      {archived.length > 0 && <div className="sec muted">Not scheduled</div>}
+      {archived.map(e => (
+        <div className="row rr" key={e.id} onClick={() => onOpen(e)}>
+          <div className="big nm" style={{ color: 'var(--muted)' }}>{e.name}</div>
+        </div>
+      ))}
+      {live.length === 0 && archived.length === 0 && <div className="sec muted">Nothing matches “{query}”.</div>}
+    </React.Fragment>
+  );
+}
+
+/* ═══════════════════════ library page ═══════════════════════ */
+
+function LibraryPage({ exercise, index, total, schedule, prev, next, onBack, onGo, onAddToDay }) {
+  const [hist, setHist] = useState(null);
+  const [picker, setPicker] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setHist(null);
+    limit(() => atAll(TBL.logs, [
+      ['filterByFormula', '{Exercise} = "' + esc(exercise.name) + '"'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+    ])).then(rs => { if (live) setHist(rs.map(shapeLog)); }).catch(() => { if (live) setHist([]); });
+    return () => { live = false; };
+  }, [exercise.name]);
+
+  const rows = schedule.filter(r => !r.weekOf && r.exercises.includes(exercise.id))
+                       .sort((a, b) => DOW.indexOf(a.dow) - DOW.indexOf(b.dow));
+  const first = rows[0];
+  const sub = first
+    ? [first.dow, first.block, pairedWith(first.prescription)].filter(Boolean).join(' · ')
+    : 'Not scheduled';
+  const last = (hist || []).filter(l => !isCompleted(l.text) && !isSkipped(l.text))[0] || null;
+  const swipe = usePageSwipe(() => prev && onGo(prev), () => next && onGo(next));
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onBack}>‹ Exercises</div>
+        <div className="pos">{index + 1} of {total}</div>
+        <div style={{ width: 60 }} />
+      </div>
+      <div className="scroll" {...swipe} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}>
+        <h1 style={{ fontSize: 30, paddingTop: 6 }}>{exercise.name}</h1>
+        <div className="sub">{sub}</div>
+
+        {(rows.length > 0 || last) && (
+          <div className="grp">
+            {rows.map(r => (
+              <div className="cell" key={r.id}>
+                <div className="k">Prescription · {r.dow}</div>
+                <div className="v">{r.prescription || 'No prescription'}</div>
+              </div>
+            ))}
+            {last && <div className="cell"><div className="k">Last result · {fmtShort(last.date)}</div><div className="v">{splitResult(last.text).body}</div></div>}
+          </div>
+        )}
+
+        <CoachingPanel notes={exercise.notes} />
+        <HistoryPanel logs={hist} date={null} />
+
+        <div className="grp">
+          <div className="cell opt" onClick={() => setPicker(true)}>
+            <div className="v" style={{ color: 'var(--orange)' }}>Add to a day</div>
+            <div className="k">›</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="nav">
+        <div onClick={() => prev && onGo(prev)} style={prev ? null : { color: 'var(--dim)' }}>{prev ? '‹ ' + prev.name : '‹'}</div>
+        <div onClick={() => next && onGo(next)} style={next ? null : { color: 'var(--dim)' }}>{next ? next.name + ' ›' : '›'}</div>
+      </div>
+
+      {picker && (
+        <React.Fragment>
+          <div className="shade" style={{ display: 'block' }} onClick={() => setPicker(false)} />
+          <div className="sheet" style={{ display: 'block' }}>
+            <div className="sheettop">
+              <div className="back" onClick={() => setPicker(false)}>Cancel</div>
+              <div className="st">Add to a day</div>
+              <div style={{ width: 50 }} />
+            </div>
+            <div className="grp">
+              {DOW.slice(1).concat([DOW[0]]).map(d => (
+                <div className="cell opt" key={d} onClick={() => { setPicker(false); onAddToDay(exercise, d); }}>
+                  <div className="v">Every {d}</div>
+                  <div className="plus">+</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════ journal ═══════════════════════ */
+
+function JournalTab({ corpus, onOpen, onMore }) {
+  const today = todayISO();
+  const byDate = useMemo(() => {
+    const m = new Map();
+    corpus.logs.forEach(l => { if (!l.date) return; m.set(l.date, (m.get(l.date) || 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [corpus.logs]);
+
+  const thisWeek = weekDays(today);
+  const weekCount = corpus.logs.filter(l => thisWeek.includes(l.date)).length;
+
+  return (
+    <React.Fragment>
+      <h1>Journal</h1>
+      <div className="sub">{corpus.logs.length} logs · {weekCount} this week</div>
+      {byDate.map(([date, n]) => (
+        <div className="row rr" key={date} onClick={() => onOpen(date)}>
+          <div>
+            <div className="big nm">{date === today ? 'Today' : dowName(date)}</div>
+            <div className="name"><span>{date === today ? fmtDayShort(date) : fmtShort(date)}</span></div>
+          </div>
+          <div className={'days' + (date === today ? ' on' : '')}>{n}</div>
+        </div>
+      ))}
+      {corpus.loading && <div className="sec muted">Loading…</div>}
+      {!corpus.loading && corpus.more && <div className="sec" style={{ color: 'var(--orange)' }} onClick={onMore}>Load more</div>}
+      {!corpus.loading && !corpus.more && byDate.length > 0 && <div className="sec muted">End of the log</div>}
+    </React.Fragment>
+  );
+}
+
+function JournalDayPage({ date, logs, note, exById, prevDate, nextDate, onBack, onGo, onOpenDay }) {
+  const { readiness, lines } = splitNotes(note ? note.notes : '');
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onBack}>‹ Journal</div>
+        <div className="pos">{fmtShort(date)}</div>
+        <div className="back" style={{ fontSize: 15 }} onClick={() => onOpenDay(date)}>Open day</div>
+      </div>
+      <div className="scroll" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}>
+        <h1 style={{ fontSize: 30, paddingTop: 6 }}>{dowName(date)}</h1>
+        <div className="sub">
+          {fmtMonthDay(date)} · {logs.length} logged
+          {readiness && <React.Fragment> · <span style={{ color: READINESS[readiness].color }}>Readiness {readiness}</span></React.Fragment>}
+        </div>
+
+        {lines.length > 0 && (
+          <div className="grp">
+            <div className="cell">
+              <div className="k">Notes</div>
+              {lines.map((t, i) => <div className="v" key={i} style={i ? { marginTop: 6 } : null}>{t}</div>)}
+            </div>
+          </div>
+        )}
+
+        <div className="grp">
+          {logs.length === 0 && <div className="cell"><div className="v muted" style={{ margin: 0 }}>Nothing logged.</div></div>}
+          {logs.map(l => {
+            const r = splitResult(l.text);
+            const skipped = isSkipped(l.text);
+            return (
+              <div className="cell" key={l.id}>
+                <div className="k">{(exById[l.exerciseId] || {}).name || '(unknown exercise)'}</div>
+                <div className={'v' + (skipped ? ' muted' : '')} style={skipped ? { margin: 0 } : null}>
+                  {isCompleted(l.text) ? 'Completed' : r.body}
+                  {r.pain != null && <span style={{ color: r.pain >= 3 ? '#FF453A' : r.pain >= 2 ? 'var(--orange)' : 'var(--muted)' }}> · pain {r.pain}</span>}
+                  {r.rpe != null && <span style={{ color: 'var(--muted)' }}> · RPE {r.rpe}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="nav">
+        <div onClick={() => prevDate && onGo(prevDate)} style={prevDate ? null : { color: 'var(--dim)' }}>
+          {prevDate ? '‹ ' + fmtDayShort(prevDate) : '‹'}
+        </div>
+        <div onClick={() => nextDate && onGo(nextDate)} style={nextDate ? null : { color: 'var(--dim)' }}>
+          {nextDate ? fmtDayShort(nextDate) + ' ›' : '›'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ races ═══════════════════════ */
+
+const raceSort = list => [...list].sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+
+function RacesTab({ races, onOpen, onDelete }) {
+  const today = todayISO();
+  const upcoming = raceSort(races.filter(r => r.status !== 'Completed' && (!r.date || r.date >= today)));
+  const done = raceSort(races.filter(r => r.status === 'Completed' || (r.date && r.date < today))).reverse();
+  const nextId = upcoming[0] ? upcoming[0].id : null;
+  const nextRace = upcoming[0];
+
+  return (
+    <React.Fragment>
+      <h1>Races</h1>
+      <div className="sub">
+        {upcoming.length} upcoming
+        {nextRace && <React.Fragment> · <span className="race">{nextRace.name} in {daysUntil(nextRace.date)} days</span></React.Fragment>}
+      </div>
+      {upcoming.map(r => (
+        <SwipeRow key={r.id} id={r.id} onDelete={() => onDelete(r)} onOpen={() => onOpen(r)} dragApi={NO_DRAG}>
+          <div className="row rr">
+            <div className="big nm">{r.name}</div>
+            <div className={'days' + (r.id === nextId ? ' on' : (r.type === 'anchor' ? ' a' : ''))}>
+              {r.date ? daysUntil(r.date) : '—'}<small>d</small>
+            </div>
+          </div>
+        </SwipeRow>
+      ))}
+      {done.map(r => (
+        <SwipeRow key={r.id} id={r.id} onDelete={() => onDelete(r)} onOpen={() => onOpen(r)} dragApi={NO_DRAG}>
+          <div className="row rr done"><div className="big nm">{r.name}</div><div className="days">✓</div></div>
+        </SwipeRow>
+      ))}
+      {races.length === 0 && <div className="sec muted">No races yet.</div>}
+    </React.Fragment>
+  );
+}
+
+const NO_DRAG = { start: () => {}, move: () => {}, end: () => {}, grip: () => {} };
+
+function RacePage({ race, index, total, prev, next, onBack, onGo }) {
+  const swipe = usePageSwipe(() => prev && onGo(prev), () => next && onGo(next));
+  const d = race.date ? daysUntil(race.date) : null;
+  const facts = [
+    ['Location', race.place],
+    ['Distance', [race.miles ? race.miles + ' mi' : '', race.elevation ? race.elevation.toLocaleString() + ' ft' : ''].filter(Boolean).join(' · ')],
+    ['Cutoff', race.cutoff ? race.cutoff + ' hr' : ''],
+    ['Status', race.status],
+  ].filter(([, v]) => v);
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onBack}>‹ Races</div>
+        <div className="pos">{index + 1} of {total}</div>
+        <div style={{ width: 60 }} />
+      </div>
+      <div className="scroll" {...swipe} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}>
+        <h1 style={{ fontSize: 30, paddingTop: 6 }}>{race.name}</h1>
+        <div className="sub">
+          {d != null && (d >= 0
+            ? <React.Fragment><span className="race">{d} days</span> · </React.Fragment>
+            : <React.Fragment><span style={{ color: 'var(--green)' }}>Done</span> · </React.Fragment>)}
+          {race.date ? fmtLongFull(race.date) : 'No date'}
+        </div>
+
+        <div className="grp">
+          {facts.map(([k, v]) => (
+            <div className="cell opt" key={k}>
+              <div className="k">{k}</div>
+              <div className="v" style={k === 'Status' ? { color: 'var(--orange)' } : null}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {race.value && (
+          <div className="grp">
+            <div className="cell"><div className="k">Training value</div><div className="v">{race.value}</div></div>
+          </div>
+        )}
+      </div>
+      <div className="nav">
+        <div onClick={() => prev && onGo(prev)} style={prev ? null : { color: 'var(--dim)' }}>{prev ? '‹ ' + prev.name : '‹'}</div>
+        <div onClick={() => next && onGo(next)} style={next ? null : { color: 'var(--dim)' }}>{next ? next.name + ' ›' : '›'}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
@@ -1001,6 +1319,11 @@ function App() {
   const [openKey, setOpenKey] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteTimes, setNoteTimes] = useState({});
+  const [exQuery, setExQuery] = useState('');
+  const [libEx, setLibEx] = useState(null);
+  const [jDate, setJDate] = useState(null);
+  const [raceId, setRaceId] = useState(null);
+  const [corpus, setCorpus] = useState({ logs: [], offset: undefined, more: true, loading: false, started: false });
 
   const today = todayISO();
   const daysRef  = useRef(days);  daysRef.current = days;
@@ -1176,6 +1499,70 @@ function App() {
     } catch (e) {
       if (e instanceof AuthError) { setReady(false); return; }
       revert();
+    }
+  };
+
+  /* ---- journal corpus, paged ---- */
+  const corpusRef = useRef(corpus); corpusRef.current = corpus;
+  const loadCorpus = useCallback(async reset => {
+    const cur = corpusRef.current;
+    if (cur.loading) return;
+    setCorpus(c => ({ ...c, loading: true, started: true }));
+    try {
+      const { records, offset } = await atPage(TBL.logs, [
+        ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'], ['pageSize', 100],
+      ], reset ? undefined : cur.offset);
+      setCorpus(c => ({
+        logs: (reset ? [] : c.logs).concat(records.map(shapeLog)),
+        offset, more: !!offset, loading: false, started: true,
+      }));
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setCorpus(c => ({ ...c, loading: false }));
+    }
+  }, []);
+
+  useEffect(() => { if (tab === 'journal' && data && !corpus.started) loadCorpus(true); }, [tab, data, corpus.started, loadCorpus]);
+
+  // The journal day page needs that date's logs and note.
+  useEffect(() => { if (jDate && !(days[jDate] && days[jDate].loaded)) loadDay(jDate).catch(() => {}); }, [jDate]);  // eslint-disable-line
+
+  /* ---- add an exercise to a weekday, on the template ---- */
+  const addToDay = async (exercise, dow) => {
+    try {
+      const home = schedRef.current.find(r => !r.weekOf && r.exercises.includes(exercise.id));
+      const rows = schedRef.current.filter(r => !r.weekOf && r.dow === dow);
+      const order = (rows.length ? Math.max(...rows.map(r => r.order)) : 0) + 10;
+      const fields = { 'Day of Week': dow, 'Order': order, 'Section': 'Main Session', 'Exercise': [exercise.id] };
+      if (home && home.prescription) fields['Prescription'] = home.prescription;
+      const made = await createMany(TBL.schedule, [fields]);
+      setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+      showToast('Added ' + exercise.name + ' to every ' + dow + '.');
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      showToast('Could not add ' + exercise.name + '.', { kind: 'error' });
+    }
+  };
+
+  /* ---- delete a race, with Undo ---- */
+  const removeRace = async race => {
+    setData(d => ({ ...d, races: d.races.filter(r => r.id !== race.id) }));
+    setRaceId(null);
+    try {
+      await deleteRace(race.id);
+      showToast('Removed ' + race.name, {
+        onUndo: async () => {
+          hideToast();
+          try {
+            const made = await createMany(TBL.races, [raceFields(race)]);
+            setData(d => ({ ...d, races: d.races.concat(made.map(shapeRace)) }));
+          } catch (e) { showToast('Could not undo that.', { kind: 'error' }); }
+        },
+      });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setData(d => ({ ...d, races: d.races.concat([race]) }));
+      showToast('Could not remove ' + race.name + '.', { kind: 'error' });
     }
   };
 
@@ -1400,14 +1787,36 @@ function App() {
 
   if (!data) return <div className="phone"><div className="boot">{status}</div></div>;
 
+  const sortedEx = [...data.exercises].sort((a, b) => a.name.localeCompare(b.name));
+  const libIndex = libEx ? sortedEx.findIndex(e => e.id === libEx.id) : -1;
+  const raceOrder = raceSort(data.races.filter(r => r.status !== 'Completed' && (!r.date || r.date >= today)))
+    .concat(raceSort(data.races.filter(r => r.status === 'Completed' || (r.date && r.date < today))).reverse());
+  const raceIndex = raceId ? raceOrder.findIndex(r => r.id === raceId) : -1;
+  const jDates = [...new Set(corpus.logs.map(l => l.date).filter(Boolean))].sort().reverse();
+  const jIndex = jDate ? jDates.indexOf(jDate) : -1;
+
   return (
     <div className={'phone' + (editing ? ' edit' : '')}>
       <div className="topbtns">
         <div className="pill round" style={{ fontSize: 18, marginRight: 'auto' }} onClick={toggleTheme}>◐</div>
-        <div className={'pill' + (editing ? ' on' : '')} onClick={() => setEditing(!editing)}>{editing ? 'Done' : 'Edit'}</div>
+        {tab === 'today' && (
+          <div className={'pill' + (editing ? ' on' : '')} onClick={() => setEditing(!editing)}>{editing ? 'Done' : 'Edit'}</div>
+        )}
       </div>
 
       <div className="scroll" ref={listRef} onPointerDown={onDown} onPointerUp={onUp}>
+        {tab === 'exercises' && (
+          <ExercisesTab exercises={data.exercises} schedule={data.schedule}
+                        query={exQuery} setQuery={setExQuery} onOpen={setLibEx} />
+        )}
+        {tab === 'journal' && (
+          <JournalTab corpus={corpus} onOpen={setJDate} onMore={() => loadCorpus(false)} />
+        )}
+        {tab === 'races' && (
+          <RacesTab races={data.races} onOpen={r => setRaceId(r.id)} onDelete={removeRace} />
+        )}
+        {tab === 'today' && (
+        <React.Fragment>
         <div className="daynav">
           <h1>{dowName(selected)}</h1>
           <div className="arrows"><span onClick={() => go(-1)}>‹</span><span onClick={() => go(1)}>›</span></div>
@@ -1430,6 +1839,8 @@ function App() {
 
         {lines.length === 0 && (
           <div style={{ padding: '40px 0', color: 'var(--dim)', fontSize: 17 }}>Nothing scheduled.</div>
+        )}
+        </React.Fragment>
         )}
       </div>
 
@@ -1472,12 +1883,34 @@ function App() {
         />
       )}
 
+      {libEx && (
+        <LibraryPage exercise={libEx} index={libIndex} total={sortedEx.length} schedule={data.schedule}
+                     prev={sortedEx[libIndex - 1] || null} next={sortedEx[libIndex + 1] || null}
+                     onBack={() => setLibEx(null)} onGo={setLibEx} onAddToDay={addToDay} />
+      )}
+
+      {jDate && (
+        <JournalDayPage date={jDate}
+                        logs={(days[jDate] || { logs: [] }).logs}
+                        note={(days[jDate] || {}).note}
+                        exById={data.exById}
+                        prevDate={jDates[jIndex + 1] || null} nextDate={jDates[jIndex - 1] || null}
+                        onBack={() => setJDate(null)} onGo={setJDate}
+                        onOpenDay={d => { setJDate(null); setSel(d); setTab('today'); }} />
+      )}
+
+      {raceIndex >= 0 && (
+        <RacePage race={raceOrder[raceIndex]} index={raceIndex} total={raceOrder.length}
+                  prev={raceOrder[raceIndex - 1] || null} next={raceOrder[raceIndex + 1] || null}
+                  onBack={() => setRaceId(null)} onGo={r => setRaceId(r.id)} />
+      )}
+
       <Toast toast={toast}
              onUndo={() => toast && toast.onUndo && toast.onUndo()}
              onScope={() => toast && toast.onScope && !toast.scopeDone && toast.onScope()} />
 
       <Tabs tab={tab}
-            onTab={id => { if (id !== 'today') showToast('That tab arrives in step 4.', { ms: 1800 }); }}
+            onTab={id => { setTab(id); setEditing(false); hideToast(); }}
             onAdd={() => showToast('The Add sheets arrive in step 5.', { ms: 1800 })} />
     </div>
   );
