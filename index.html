@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Resist">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Resist</title>
+<style>
+
+  :root{--bg:#000;--text:#FFF;--muted:#8E8E93;--dim:#48484A;--hair:#2C2C2E;--orange:#FF9F0A;--green:#30D158;--pill:#1C1C1E;--tab:rgba(28,28,30,.92);--sheet:#1C1C1E;--sheetgrp:#2C2C2E;--tgoff:#39393D;--seg:#2C2C2E;--segon:#636366;--segtext:#fff}
+  [data-theme="light"]{--bg:#F2F2F7;--text:#000;--muted:#6E6E73;--dim:#C7C7CC;--hair:#D8D8DC;--orange:#FF9500;--green:#34C759;--pill:#FFFFFF;--tab:rgba(249,249,249,.92);--sheet:#F2F2F7;--sheetgrp:#FFFFFF;--tgoff:#E9E9EB;--seg:#E9E9EB;--segon:#FFFFFF;--segtext:#000}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",sans-serif;background:#111;color:var(--text);-webkit-font-smoothing:antialiased}
+  .phone{background:var(--bg);width:100%;max-width:430px;height:100dvh;margin:0 auto;position:relative;overflow:hidden;display:flex;flex-direction:column}
+  @media (min-width:600px){ body{padding:24px 0} .phone{height:calc(100dvh - 48px);border-radius:44px;border:1px solid #333} }
+  .scroll{flex:1;overflow-y:auto;padding:0 20px calc(env(safe-area-inset-bottom) + 110px)}
+
+  .topbtns{display:flex;justify-content:flex-end;gap:10px;padding:calc(env(safe-area-inset-top) + 14px) 20px 0}
+  .pill{background:var(--pill);color:var(--text);border-radius:20px;height:38px;padding:0 16px;display:grid;place-items:center;font-size:16px;font-weight:500}
+  .pill.round{width:38px;padding:0;font-size:24px;font-weight:300}
+  .pill.on{background:var(--orange);color:#000}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.02em;padding:14px 0 2px}
+  .sub{color:var(--muted);font-size:15px;margin-bottom:6px}
+  .race{color:var(--orange);font-size:15px;font-weight:500}
+
+  .sec{font-size:17px;font-weight:600;padding:22px 0 4px;display:flex;align-items:center;gap:8px}
+  .sec .ic{font-size:15px}
+  .sec.muted{color:var(--muted);font-weight:500}
+
+  .row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--hair);gap:14px}
+  .row:last-child{border-bottom:0}
+  .row.note{margin-bottom:0}
+  .rd{color:var(--muted);font-size:15px;display:flex;align-items:center;gap:7px}
+  .rd .dot{width:10px;height:10px;border-radius:50%;background:var(--green)}
+  .big{font-size:50px;font-weight:300;letter-spacing:-.03em;line-height:1.05;white-space:nowrap}
+  .big.nm{font-size:28px;font-weight:400;letter-spacing:-.02em;white-space:normal;line-height:1.15}
+  .big small{font-size:30px;font-weight:300;margin-left:2px}
+  .row .name{font-size:15px;color:var(--text);margin-top:2px}
+  .row .name span{color:var(--muted)}
+  .row .name{font-size:15px}
+  .row.done .big,.row.done .name{color:var(--muted)}
+  .row.done .big{font-weight:200}
+  .row.text .big{font-size:26px;font-weight:400;letter-spacing:-.01em;white-space:normal;line-height:1.2}
+
+  /* toggle */
+  .tg{width:51px;height:31px;border-radius:16px;background:var(--tgoff);position:relative;flex:none;transition:background .2s}
+  .tg i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+  .done .tg{background:var(--green)} .done .tg i{left:22px}
+  .haslog:not(.done) .tg i:after{content:"";position:absolute;left:10px;top:10px;width:7px;height:7px;border-radius:50%;background:var(--orange)}
+
+  .change{background:#3A2A0F;color:var(--orange);font-size:12px;font-weight:700;letter-spacing:.06em;border-radius:14px;padding:6px 12px;flex:none}
+
+  /* notes */
+
+  /* edit mode */
+  .edit .row{padding-left:0}
+  .edit .del{display:grid}
+  .del{display:none;width:22px;height:22px;border-radius:50%;background:#FF453A;color:#fff;place-items:center;font-size:20px;line-height:0;flex:none;margin-right:6px}
+  .edit .tg{display:none}
+  .grip{display:none;color:var(--dim);font-size:22px;flex:none}
+  .edit .grip{display:block}
+  .edit .chev{display:block;color:var(--dim);margin-left:8px}
+  .chev{display:none}
+
+
+
+
+  .screen{display:none;flex:1;flex-direction:column;min-height:0}
+  .screen.on{display:flex}
+  .rr .name{margin-top:3px}
+  .rr .name span{font-size:14px}
+  #s-j .name{margin-top:0}
+  #s-j .name span{font-size:15px}
+  .days{font-size:26px;font-weight:300;color:var(--muted);flex:none;letter-spacing:-.02em;margin-left:12px}
+  .days small{font-size:14px;margin-left:1px}
+  .days.on{color:var(--orange)}
+  .days.a{color:var(--text)}
+  .rr.done .big{color:var(--muted)}
+  .rr.done .days{color:var(--green);font-size:22px}
+
+
+  .daynav{display:flex;align-items:center;justify-content:space-between}
+  .arrows{display:flex;gap:6px;padding-top:12px}
+  .arrows span{width:36px;height:36px;border-radius:50%;background:var(--pill);color:var(--orange);display:grid;place-items:center;font-size:24px;line-height:0;padding-bottom:3px}
+  .toast{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 84px);background:#2C2C2E;color:#fff;border-radius:14px;padding:12px 16px;font-size:15px;display:none;justify-content:space-between;align-items:center;z-index:15;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .toast.on{display:flex}
+  .tacts{display:flex;gap:16px;align-items:center}
+  .tacts b{color:var(--orange);font-weight:600}
+  .tacts i{font-style:normal;color:var(--muted);font-size:14px}
+  .tacts i.on{color:#fff}
+
+  /* swipe + drag */
+  .sw{position:relative;overflow:hidden}
+  .sw .row{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+  .sw .del2{position:absolute;right:0;top:0;bottom:0;width:90px;background:#FF453A;color:#fff;font-weight:600;display:grid;place-items:center;font-size:16px}
+  .sw.lift .row{background:var(--pill);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);z-index:5;transform:scale(1.02)}
+  .sw.gap-top{border-top:2px solid var(--orange)}
+  .sw.gap-bot{border-bottom:2px solid var(--orange)}
+  .tab.add{color:var(--orange)}
+  .shade{display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:20}
+  .sheet{display:none;position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:18px 18px 0 0;padding:0 16px calc(env(safe-area-inset-bottom) + 16px);z-index:21;max-height:80%;overflow-y:auto}
+  .sheet .grp{background:var(--sheetgrp)}
+  .sheet .cell{border-color:var(--hair)}
+  .open-add .shade{display:block}
+  .open-add.on-today #exsheet{display:block}
+  .open-add.on-races #racesheet{display:block}
+  .open-add.on-lib #newexsheet{display:block}
+  .sheettop{display:flex;align-items:center;justify-content:space-between;padding:14px 0 2px}
+  .sheettop .back{color:var(--orange);font-size:17px}
+  .sheettop .st{font-weight:600;font-size:17px}
+  .cell.opt{display:flex;align-items:center;justify-content:space-between}
+  .cell.opt .k{margin:1px 0 0}
+  #rp .cell.opt .k{font-size:15px;color:var(--muted)}
+  #rp .cell.opt .v{font-size:17px}
+  .plus{width:30px;height:30px;border-radius:50%;background:var(--seg);color:var(--orange);display:grid;place-items:center;font-size:22px;line-height:0}
+
+  /* exercise page */
+  .pg{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;transform:translateX(100%);transition:transform .22s ease-out}
+  .pg.on{display:flex;transform:translateX(0)}
+  .pgtop{display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 14px) 20px 0}
+  .pgtop .back{color:var(--orange);font-size:17px}
+  .pgtop .pos{color:var(--muted);font-size:14px}
+  .grp{background:var(--pill);border-radius:14px;margin-top:16px;overflow:hidden}
+  .cell{padding:12px 16px;border-bottom:1px solid var(--hair)}
+  .cell:last-child{border-bottom:0}
+  .k{color:var(--muted);font-size:13px;font-weight:500;letter-spacing:.02em;margin-bottom:3px}
+  .v{font-size:17px;line-height:1.4}
+  .v.muted{color:var(--muted);font-size:15px;margin-top:8px}
+  .cell.in{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 16px}
+  .inp{flex:1;background:transparent;border:0;color:var(--text);font:inherit;font-size:19px;outline:none;min-width:0}
+  .inp::placeholder{color:var(--dim)}
+  .save{background:var(--orange);color:#000;font-weight:600;border-radius:18px;padding:8px 16px;font-size:15px}
+  .cell.chips{display:flex;gap:8px;flex-wrap:wrap}
+  .cell.chips span{border:1px solid var(--hair);border-radius:16px;padding:6px 12px;font-size:14px;color:var(--text)}
+  .cell.seg{display:flex;align-items:center;justify-content:space-between}
+  .cell.seg .k{margin:0;font-size:15px;color:var(--text)}
+  .segc{display:flex;background:var(--seg);border-radius:9px;padding:2px}
+  .segc span{width:40px;text-align:center;padding:5px 0;border-radius:7px;font-size:14px;color:var(--muted)}
+  .segc span.on{background:var(--segon);color:var(--segtext)}
+  .segc.rdy span{width:64px}
+  .segc.rdy .g.on{background:var(--green);color:#000}.segc.rdy .y.on{background:var(--orange);color:#000}.segc.rdy .r.on{background:#FF453A;color:#fff}
+  .h{display:flex;gap:12px;font-size:16px;padding:7px 0;border-top:1px solid var(--hair)}
+  .h:first-of-type{border-top:0}
+  .h span{color:var(--muted);width:56px;flex:none;font-size:14px;padding-top:2px}
+  .more{color:var(--orange);font-size:15px;padding:10px 0 2px}
+  .nav{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 12px);background:var(--tab);backdrop-filter:blur(20px);border-radius:32px;display:flex;justify-content:space-between;padding:16px 22px;border:1px solid var(--hair);font-size:16px;color:var(--orange)}
+
+  /* tab bar */
+  .tabs{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 12px);background:var(--tab);backdrop-filter:blur(20px);border-radius:32px;display:flex;padding:8px 6px;border:1px solid var(--hair)}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:10px;font-weight:500;padding:6px 0;border-radius:24px}
+  .tab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6}
+  .tab.on{color:var(--orange);background:#3A2A0F}
+
+  /* week strip (in the Sleep | Wake Up slot) */
+  .week{display:flex;justify-content:space-between;padding:10px 0 4px}
+  .week div{text-align:center;color:var(--muted);font-size:12px;width:40px}
+  .week b{display:block;font-size:20px;font-weight:400;color:var(--text);margin-top:2px}
+  .week .on b{color:var(--orange)}
+  .week .on{color:var(--orange)}
+
+  /* ── app additions on top of the mockup stylesheet ── */
+  .rowwrap{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y;user-select:none;-webkit-user-select:none;z-index:1}
+  .sw .del2{z-index:0}
+  .sw.lift .rowwrap{background:var(--pill);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);transform:scale(1.02);z-index:5}
+  .sw:last-child .row{border-bottom:0}
+  input,textarea,button{font-family:inherit}
+  button{border:0;background:none;color:inherit;font:inherit}
+  .pill,.tab,.row,.cell.opt,.segc span,.cell.chips span,.more,.save,.plus,.arrows span,.del,.grip{cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .setup{padding:48px 24px}
+  .setup h1{font-size:34px;font-weight:700;padding:0 0 6px}
+  .setup p{color:var(--muted);font-size:15px;margin-bottom:20px;line-height:1.45}
+  .setup input{width:100%;background:var(--pill);border:0;border-radius:14px;padding:15px 16px;font:inherit;font-size:17px;color:var(--text);outline:none}
+  .setup button{margin-top:12px;width:100%;background:var(--orange);color:#000;border-radius:14px;padding:15px;font-weight:600;font-size:17px}
+  .setup .err{color:#FF453A;font-size:14px;margin-top:12px}
+  .boot{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:var(--muted);font-size:15px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ═══════════════════════ config ═══════════════════════ */
+
+const BASE = 'appmqPkBzBzcKlrce';
+const TBL = {
+  exercises: 'tblQ39nQ8p8HRSsIC',
+  schedule : 'tblZP0Fg1dKWJzII2',
+  logs     : 'tblvJWkX10l1Fs6iE',
+  races    : 'tblusBLP1tM1sR7DH',
+  dayNotes : 'tblxTF4kmjHnGv4fx',
+};
+
+// Races field names as they actually stand in the base. The spec calls them
+// Mi / Elev / Cutoff (hr); Airtable has Miles / Elevation / Cutoff Hours.
+const F = {
+  done      : 'Done',
+  miles     : 'Miles',
+  elevation : 'Elevation',
+  cutoff    : 'Cutoff Hours',
+  raceType  : 'Race Type',
+};
+
+const LS_PAT     = 'resist.pat';
+const LS_THEME   = 'resist.theme';
+const LS_MIGRATE = 'resist.doneMigration';
+
+const STALE_MS = 60 * 60 * 1000;
+
+/* ═══════════════════════ dates ═══════════════════════ */
+
+const DOW  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DOW3 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const parseISO = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const iso       = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const todayISO  = () => iso(new Date());
+const addDays   = (s, n) => { const d = parseISO(s); d.setDate(d.getDate()+n); return iso(d); };
+const dowName   = s => DOW[parseISO(s).getDay()];
+const dow3      = s => DOW3[parseISO(s).getDay()];
+const weekStartOf = s => { const d = parseISO(s); const wd = d.getDay(); d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd)); return iso(d); };
+const weekDays  = s => { const m = weekStartOf(s); return Array.from({length:7}, (_,i) => addDays(m, i)); };
+const nextMonday = s => addDays(weekStartOf(s), 7);
+
+const fmtMonthDay = s => { const d = parseISO(s); return MON[d.getMonth()] + ' ' + d.getDate(); };
+const fmtShort    = s => { const d = parseISO(s); return MON3[d.getMonth()] + ' ' + d.getDate(); };
+const fmtDayShort = s => { const d = parseISO(s); return DOW3[d.getDay()] + ', ' + MON3[d.getMonth()] + ' ' + d.getDate(); };
+const fmtLongFull = s => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); };
+const daysUntil   = s => Math.round((parseISO(s) - parseISO(todayISO())) / 86400000);
+const weekRange   = ws => {
+  const end = addDays(ws, 6), a = parseISO(ws), b = parseISO(end);
+  return a.getMonth() === b.getMonth()
+    ? MON3[a.getMonth()] + ' ' + a.getDate() + ' – ' + b.getDate()
+    : fmtShort(ws) + ' – ' + fmtShort(end);
+};
+
+/* ═══════════════════════ Airtable REST ═══════════════════════ */
+
+class AuthError extends Error {}
+
+let PAT = localStorage.getItem(LS_PAT) || '';
+const setPat = v => { PAT = v; v ? localStorage.setItem(LS_PAT, v) : localStorage.removeItem(LS_PAT); };
+
+const qs = pairs => pairs.map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+const esc = s => String(s).replace(/"/g, '\\"');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function at(table, { method = 'GET', params = [], body } = {}) {
+  const url = 'https://api.airtable.com/v0/' + BASE + '/' + table + (params.length ? '?' + qs(params) : '');
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: 'Bearer ' + PAT, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401 || res.status === 403) { setPat(''); throw new AuthError('Airtable rejected the token'); }
+    // Airtable allows five requests a second per base; wait the limit out.
+    if (res.status === 429 && attempt < 5) { await sleep(400 * (attempt + 1)); continue; }
+    if (!res.ok) throw new Error('Airtable ' + res.status + ': ' + (await res.text()).slice(0, 200));
+    return res.status === 204 ? {} : res.json();
+  }
+}
+
+async function atAll(table, params = []) {
+  const out = [];
+  let offset;
+  do {
+    const j = await at(table, { params: offset ? params.concat([['offset', offset]]) : params });
+    out.push(...j.records);
+    offset = j.offset;
+  } while (offset);
+  return out;
+}
+
+async function atPage(table, params, offset) {
+  const j = await at(table, { params: offset ? params.concat([['offset', offset]]) : params });
+  return { records: j.records, offset: j.offset };
+}
+
+// Every write endpoint caps at ten records.
+const chunk10 = arr => { const out = []; for (let i = 0; i < arr.length; i += 10) out.push(arr.slice(i, i + 10)); return out; };
+
+async function createMany(table, fieldsList) {
+  const made = [];
+  for (const batch of chunk10(fieldsList)) {
+    const j = await at(table, { method: 'POST', body: { records: batch.map(fields => ({ fields })) } });
+    made.push(...j.records);
+  }
+  return made;
+}
+async function updateMany(table, records) {
+  const done = [];
+  for (const batch of chunk10(records)) {
+    const j = await at(table, { method: 'PATCH', body: { records: batch } });
+    done.push(...j.records);
+  }
+  return done;
+}
+async function deleteMany(table, ids) {
+  for (const batch of chunk10(ids)) {
+    await at(table, { method: 'DELETE', params: batch.map(id => ['records[]', id]) });
+  }
+}
+
+// Caps concurrent reads so the per-exercise fan-out stays under the rate limit.
+function makeLimiter(n) {
+  let active = 0; const queue = [];
+  const next = () => {
+    if (active >= n || !queue.length) return;
+    active++;
+    const { fn, res, rej } = queue.shift();
+    fn().then(res, rej).finally(() => { active--; next(); });
+  };
+  return fn => new Promise((res, rej) => { queue.push({ fn, res, rej }); next(); });
+}
+const limit = makeLimiter(3);
+
+/* ═══════════════════════ shaping ═══════════════════════ */
+
+const shapeExercise = r => ({ id: r.id, name: r.fields['Name'] || '', notes: r.fields['Coaching Notes'] || '' });
+
+const shapeRow = r => ({
+  id: r.id,
+  dow: r.fields['Day of Week'] || '',
+  order: r.fields['Order'] == null ? 1e9 : r.fields['Order'],
+  section: r.fields['Section'] || '',
+  block: (r.fields['Block'] || '').trim(),
+  weekOf: r.fields['Week Of'] || '',
+  exercises: r.fields['Exercise'] || [],
+  prescription: r.fields['Prescription'] || '',
+});
+
+// The write shape of a Schedule row, for copy-on-write and Undo.
+const rowFields = (r, weekOf) => {
+  const f = { 'Day of Week': r.dow, 'Order': r.order, 'Exercise': r.exercises };
+  if (weekOf !== undefined) { if (weekOf) f['Week Of'] = weekOf; }
+  else if (r.weekOf) f['Week Of'] = r.weekOf;
+  if (r.section) f['Section'] = r.section;
+  if (r.block) f['Block'] = r.block;
+  if (r.prescription) f['Prescription'] = r.prescription;
+  return f;
+};
+
+const shapeLog = r => ({
+  id: r.id,
+  exerciseId: (r.fields['Exercise'] || [])[0] || '',
+  date: r.fields['Log Date'] || '',
+  text: r.fields['Log Text'] || '',
+  done: !!r.fields[F.done],
+});
+
+const shapeRace = r => ({
+  id: r.id,
+  name: r.fields['Name'] || '',
+  date: r.fields['Date'] || '',
+  place: r.fields['City/State'] || '',
+  miles: r.fields[F.miles] ?? null,
+  elevation: r.fields[F.elevation] ?? null,
+  cutoff: r.fields[F.cutoff] ?? null,
+  status: r.fields['Status'] || '',
+  type: r.fields[F.raceType] || '',
+  value: r.fields['Training Value'] || '',
+});
+
+const shapeNote = r => ({ id: r.id, date: r.fields['Date'] || '', notes: r.fields['Notes'] || '' });
+
+/* ═══════════════════════ log text: pain / RPE ═══════════════════════ */
+
+function splitResult(text) {
+  let body = String(text || ''), pain = null, rpe = null, m;
+  for (;;) {
+    if ((m = body.match(/\s*·\s*RPE\s*(\d+)\s*$/i)))  { rpe  = +m[1]; body = body.slice(0, m.index); continue; }
+    if ((m = body.match(/\s*·\s*pain\s*(\d+)\s*$/i))) { pain = +m[1]; body = body.slice(0, m.index); continue; }
+    break;
+  }
+  return { body: body.trim(), pain, rpe };
+}
+const joinResult = (body, pain, rpe) =>
+  body.trim() + (pain == null ? '' : ' · pain ' + pain) + (rpe == null ? '' : ' · RPE ' + rpe);
+
+const isSkipped   = t => /^\s*skipped\b/i.test(String(t || ''));
+const isCompleted = t => String(t || '').trim() === 'Completed';
+
+/* ═══════════════════════ day notes ═══════════════════════ */
+
+const READINESS = {
+  Green:  { key: 'g', color: 'var(--green)' },
+  Yellow: { key: 'y', color: 'var(--orange)' },
+  Red:    { key: 'r', color: '#FF453A' },
+};
+
+// Line 1 may be "Readiness: Green"; it is stripped from the visible list.
+function splitNotes(raw) {
+  const lines = String(raw || '').split('\n').map(s => s.trim()).filter(Boolean);
+  let readiness = null;
+  if (lines.length) {
+    const m = lines[0].match(/^Readiness:\s*(Green|Yellow|Red)\s*$/i);
+    if (m) { readiness = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(); lines.shift(); }
+  }
+  return { readiness, lines };
+}
+const buildNotes = (readiness, lines) =>
+  (readiness ? ['Readiness: ' + readiness] : []).concat(lines).join('\n');
+
+/* ═══════════════════════ week resolution ═══════════════════════ */
+
+// Rows carrying the week's Monday in Week Of are an overlay and replace the
+// template outright; otherwise the template rows are the week.
+function weekRows(schedule, dateISO) {
+  const ws = weekStartOf(dateISO);
+  const overlay = schedule.filter(r => r.weekOf === ws);
+  return { weekStart: ws, isOverlay: overlay.length > 0, rows: overlay.length ? overlay : schedule.filter(r => !r.weekOf) };
+}
+
+function rowsForDate(schedule, dateISO) {
+  const { rows, isOverlay, weekStart } = weekRows(schedule, dateISO);
+  const dow = dowName(dateISO);
+  return { weekStart, isOverlay, rows: rows.filter(r => r.dow === dow).sort((a, b) => a.order - b.order) };
+}
+
+// One line per linked exercise, so a row linking two yields two rows on screen.
+function linesForDate(schedule, dateISO, exById) {
+  const { rows, isOverlay, weekStart } = rowsForDate(schedule, dateISO);
+  const lines = [];
+  for (const r of rows) {
+    for (const exId of r.exercises) {
+      lines.push({
+        key: r.id + ':' + exId,
+        rowId: r.id,
+        exerciseId: exId,
+        name: (exById[exId] || {}).name || '(unknown exercise)',
+        prescription: r.prescription,
+        section: r.section,
+        block: r.block,
+        order: r.order,
+      });
+    }
+  }
+  return { weekStart, isOverlay, lines };
+}
+
+// "…paired with X" out of a prescription, for the exercise page subtitle.
+const pairedWith = rx => { const m = String(rx || '').match(/paired with ([^—·\n]+)/i); return m ? 'paired with ' + m[1].trim() : ''; };
+
+/* ═══════════════════════ copy-on-write ═══════════════════════ */
+
+async function materializeWeek(schedule, weekStart) {
+  const already = schedule.filter(r => r.weekOf === weekStart);
+  if (already.length) return { rows: already, map: null, wasNeeded: false };
+
+  const template = schedule.filter(r => !r.weekOf);
+  const made = await createMany(TBL.schedule, template.map(r => rowFields(r, weekStart)));
+  const rows = made.map(shapeRow);
+  // Airtable returns created records in the order sent, so a template row and
+  // its copy line up by index.
+  const map = Object.fromEntries(template.map((t, i) => [t.id, rows[i]]));
+  return { rows, map, wasNeeded: true };
+}
+
+async function copyWeekInto(schedule, fromDate, targetWeekStart) {
+  if (schedule.some(r => r.weekOf === targetWeekStart)) return { created: [], alreadyThere: true };
+  const { rows } = weekRows(schedule, fromDate);
+  const made = await createMany(TBL.schedule, rows.map(r => rowFields(r, targetWeekStart)));
+  return { created: made.map(shapeRow), alreadyThere: false };
+}
+
+/* ═══════════════════════ one-time Done migration ═══════════════════════ */
+
+// Every log predating the Done field represents work that was completed, so
+// Done is backfilled to true once. Idempotent: only rows still unchecked are
+// written, so re-running it is a no-op.
+async function countPendingDone() {
+  const all = await atAll(TBL.logs, [['fields[]', F.done]]);
+  return { total: all.length, pending: all.filter(r => !r.fields[F.done]).length };
+}
+
+async function migrateDone(onProgress) {
+  const all = await atAll(TBL.logs, [['fields[]', F.done]]);
+  const pending = all.filter(r => !r.fields[F.done]);
+  let written = 0;
+  for (const batch of chunk10(pending)) {
+    await updateMany(TBL.logs, batch.map(r => ({ id: r.id, fields: { [F.done]: true } })));
+    written += batch.length;
+    if (onProgress) onProgress(written, pending.length);
+  }
+  return { total: all.length, written, alreadyDone: all.length - pending.length };
+}
+
+/* ═══════════════════════ writes ═══════════════════════ */
+
+const createLog = (exerciseId, date, text, done) =>
+  at(TBL.logs, { method: 'POST', body: { records: [{ fields: { 'Exercise': [exerciseId], 'Log Date': date, 'Log Text': text, [F.done]: !!done } }] } });
+const patchLog = (id, fields) =>
+  at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields }] } });
+const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
+
+const setRowExercises = (id, exercises) =>
+  at(TBL.schedule, { method: 'PATCH', body: { records: [{ id, fields: { 'Exercise': exercises } }] } });
+
+/* ═══════════════════════ icons ═══════════════════════ */
+
+const IcToday = () => <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l3 2M9 2h6" /></svg>;
+const IcEx    = () => <svg viewBox="0 0 24 24"><path d="M3 10v4M21 10v4M6 8v8M18 8v8M6 12h12" /></svg>;
+const IcJour  = () => <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
+const IcRaces = () => <svg viewBox="0 0 24 24"><path d="M5 3v18M5 4h11l-2 3 2 3H5" /></svg>;
+const IcAdd   = () => <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>;
+
+/* ═══════════════════════ toast ═══════════════════════ */
+
+function Toast({ toast, onUndo, onScope }) {
+  if (!toast) return null;
+  return (
+    <div className="toast on">
+      <span>{toast.text}</span>
+      <div className="tacts">
+        {toast.onUndo && <b onClick={onUndo}>Undo</b>}
+        {toast.scopeLabel && (
+          <i className={toast.scopeDone ? 'on' : ''} onClick={onScope}>
+            {toast.scopeLabel}{toast.scopeDone ? ' ✓' : ''}
+          </i>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ today rows ═══════════════════════ */
+
+// Swipe left to delete, press and hold to reorder. The axis is decided once
+// per touch; a pointercancel — the browser taking the gesture over to scroll —
+// always snaps back rather than committing anything.
+function SwipeRow({ children, editing, onDelete, onOpen, dragApi, id }) {
+  const sw = useRef(null);
+  const row = useRef(null);
+  const g = useRef(null);
+  const hold = useRef(null);
+  const moved = useRef(false);
+
+  const setX = x => { if (row.current) row.current.style.transform = x ? 'translateX(' + x + 'px)' : ''; };
+
+  const clearHold = () => { clearTimeout(hold.current); hold.current = null; };
+
+  const down = e => {
+    if (editing || e.target.closest('.tg')) return;
+    g.current = { x0: e.clientX, y0: e.clientY, lastX: e.clientX, axis: null, dragging: false };
+    moved.current = false;
+    if (row.current) row.current.style.transition = 'none';
+    hold.current = setTimeout(() => {
+      const s = g.current;
+      if (!s || s.axis) return;
+      s.dragging = true;
+      moved.current = true;
+      dragApi.start(id, sw.current);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 400);
+  };
+
+  const move = e => {
+    const s = g.current;
+    if (!s) return;
+    if (s.dragging) { dragApi.move(e.clientY); return; }
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (s.axis === null) {
+      if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
+        s.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
+        clearHold();
+        if (s.axis !== 'x') setX(0);
+      } else return;
+    }
+    if (s.axis !== 'x') return;
+    s.lastX = e.clientX;
+    moved.current = true;
+    setX(Math.min(0, Math.max(dx, -100)));
+  };
+
+  const finish = commit => () => {
+    clearHold();
+    const s = g.current;
+    g.current = null;
+    if (!s) return;
+    if (s.dragging) { dragApi.end(commit); setTimeout(() => { moved.current = false; }, 60); return; }
+    if (row.current) row.current.style.transition = '';
+    if (!commit || s.axis !== 'x') return setX(0);
+    const dx = s.lastX - s.x0;
+    if (dx < -150) { setX(-window.innerWidth); setTimeout(onDelete, 180); }
+    else if (dx < -60) setX(-90);
+    else setX(0);
+  };
+
+  return (
+    <div className="sw" ref={sw} data-id={id}>
+      <div className="del2" onClick={onDelete}>Delete</div>
+      <div ref={row} className="rowwrap"
+           onPointerDown={down} onPointerMove={move}
+           onPointerUp={finish(true)} onPointerCancel={finish(false)}
+           onClick={e => { if (moved.current) { e.stopPropagation(); moved.current = false; return; } if (onOpen) onOpen(); }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ExerciseRow({ line, log, editing, onToggle, onOpen, onDelete, dragApi }) {
+  const done = !!(log && log.done);
+  const hasLog = !!log;
+  return (
+    <SwipeRow id={line.key} editing={editing} onDelete={onDelete} onOpen={onOpen} dragApi={dragApi}>
+      <div className={'row' + (done ? ' done' : '') + (hasLog ? ' haslog' : '')}>
+        <div className="del" onClick={e => { e.stopPropagation(); onDelete(); }}>–</div>
+        <div style={{ flex: 1 }}><div className="big nm">{line.name}</div></div>
+        <div className="tg" onClick={e => { e.stopPropagation(); onToggle(); }}><i /></div>
+        <span className="grip" onPointerDown={e => { e.stopPropagation(); dragApi.grip(e, line.key); }}>☰</span>
+      </div>
+    </SwipeRow>
+  );
+}
+
+function NotesRow({ readiness, count, onOpen }) {
+  return (
+    <div className="row note" onClick={onOpen}>
+      <div className="big nm">Notes</div>
+      <div className="rd">
+        {readiness && <span className="dot" style={{ background: READINESS[readiness].color }} />}
+        {readiness ? readiness + ' · ' + count : (count ? count + '' : 'None')}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ tab bar ═══════════════════════ */
+
+function Tabs({ tab, onTab, onAdd }) {
+  const t = (id, label, icon) => (
+    <div className={'tab' + (tab === id ? ' on' : '')} onClick={() => onTab(id)}>{icon}{label}</div>
+  );
+  return (
+    <div className="tabs">
+      {t('today', 'Today', <IcToday />)}
+      {t('exercises', 'Exercises', <IcEx />)}
+      {t('journal', 'Journal', <IcJour />)}
+      {t('races', 'Races', <IcRaces />)}
+      <div className="tab add" onClick={onAdd}><IcAdd />Add</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ app ═══════════════════════ */
+
+function Setup({ onDone }) {
+  const [v, setV] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const token = v.trim();
+    if (!token) return;
+    setBusy(true); setErr('');
+    setPat(token);
+    try { await at(TBL.exercises, { params: [['maxRecords', 1]] }); onDone(); }
+    catch (e) {
+      setPat('');
+      setErr(e instanceof AuthError ? 'That token was rejected. Check its scopes and base access.' : String(e.message || e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="setup">
+      <h1>Resist</h1>
+      <p>Paste an Airtable personal access token with <b>data.records:read</b> and <b>data.records:write</b> on the Training base. It is kept on this device only.</p>
+      <input type="password" value={v} placeholder="pat…" autoCapitalize="off" autoCorrect="off" spellCheck="false"
+             onChange={e => setV(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
+      <button onClick={submit} disabled={busy}>{busy ? 'Checking…' : 'Connect'}</button>
+      {err && <div className="err">{err}</div>}
+    </div>
+  );
+}
+
+function App() {
+  const [ready, setReady]   = useState(!!PAT);
+  const [error, setError]   = useState('');
+  const [status, setStatus] = useState('Loading…');
+  const [pending, setPending] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [tick, setTick]     = useState(0);
+
+  const [data, setData]     = useState(null);
+  const [tab, setTab]       = useState('today');
+  const [selected, setSel]  = useState(todayISO());
+  const [days, setDays]     = useState({});
+  const [editing, setEditing] = useState(false);
+  const [toast, setToast]   = useState(null);
+  const [hidden, setHidden] = useState({});
+  const [orderOf, setOrderOf] = useState({});
+  const [theme, setTheme]   = useState(document.documentElement.dataset.theme);
+
+  const today = todayISO();
+  const daysRef  = useRef(days);  daysRef.current = days;
+  const schedRef = useRef([]);    schedRef.current = data ? data.schedule : [];
+  const toastTimer = useRef(null);
+
+  /* ---- toast ---- */
+  const showToast = useCallback((text, opts = {}) => {
+    clearTimeout(toastTimer.current);
+    setToast({ text, ...opts });
+    toastTimer.current = setTimeout(() => setToast(null), opts.ms || 5000);
+  }, []);
+  const hideToast = useCallback(() => { clearTimeout(toastTimer.current); setToast(null); }, []);
+
+  /* ---- load ---- */
+  const loadCore = useCallback(async () => {
+    const [ex, sch, races] = await Promise.all([atAll(TBL.exercises), atAll(TBL.schedule), atAll(TBL.races)]);
+    const exercises = ex.map(shapeExercise);
+    setData({
+      exercises,
+      exById: Object.fromEntries(exercises.map(e => [e.id, e])),
+      schedule: sch.map(shapeRow),
+      races: races.map(shapeRace),
+      fetchedAt: Date.now(),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    (async () => {
+      try {
+        let migration = JSON.parse(localStorage.getItem(LS_MIGRATE) || 'null');
+        if (!migration) {
+          setStatus('Checking the Logs table…');
+          const c = await countPendingDone();
+          if (!live) return;
+          if (c.pending > 0) { setPending(c); return; }
+          localStorage.setItem(LS_MIGRATE, JSON.stringify({ total: c.total, written: 0, alreadyDone: c.total, at: new Date().toISOString() }));
+        }
+        if (!live) return;
+        setStatus('Loading the plan…');
+        await loadCore();
+      } catch (e) {
+        if (!live) return;
+        if (e instanceof AuthError) { setReady(false); setError(''); }
+        else setError(String(e.message || e));
+      }
+    })();
+    return () => { live = false; };
+  }, [ready, tick, loadCore]);
+
+  const runMigration = async () => {
+    setRunning(true);
+    try {
+      const r = await migrateDone((n, t) => setStatus('Updating… ' + n + ' of ' + t));
+      localStorage.setItem(LS_MIGRATE, JSON.stringify({ ...r, at: new Date().toISOString() }));
+      console.log('Done migration: ' + r.written + ' of ' + r.total + ' logs updated');
+      setPending(null); setRunning(false); setTick(t => t + 1);
+    } catch (e) {
+      setRunning(false);
+      if (e instanceof AuthError) setReady(false); else setError(String(e.message || e));
+    }
+  };
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || !data) return;
+      if (Date.now() - data.fetchedAt > STALE_MS) loadCore().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [data, loadCore]);
+
+  /* ---- per-date logs and note ---- */
+  const patchDay = useCallback((date, fn) => {
+    setDays(prev => {
+      const cur = prev[date] || { logs: [], note: null, loaded: false };
+      return { ...prev, [date]: { ...cur, ...fn(cur) } };
+    });
+  }, []);
+
+  const loadDay = useCallback(async d => {
+    const [logs, notes] = await Promise.all([
+      limit(() => atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']])),
+      limit(() => atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']])),
+    ]);
+    patchDay(d, () => ({ logs: logs.map(shapeLog), note: notes[0] ? shapeNote(notes[0]) : null, loaded: true }));
+  }, [patchDay]);
+
+  useEffect(() => {
+    if (!data) return;
+    [selected, addDays(selected, -1), addDays(selected, 1)].forEach(d => {
+      if (!(days[d] && days[d].loaded)) loadDay(d).catch(() => {});
+    });
+  }, [data, selected]);  // eslint-disable-line
+
+  /* ---- derived ---- */
+  const resolved = useMemo(
+    () => (data ? linesForDate(data.schedule, selected, data.exById) : { lines: [], isOverlay: false, weekStart: weekStartOf(selected) }),
+    [data, selected]);
+
+  const lines = useMemo(() => {
+    let ls = resolved.lines.filter(l => !hidden[l.key]);
+    const ord = orderOf[selected];
+    if (ord) {
+      const pos = Object.fromEntries(ord.map((k, i) => [k, i]));
+      ls = [...ls].sort((a, b) => (pos[a.key] ?? 1e9) - (pos[b.key] ?? 1e9));
+    }
+    return ls;
+  }, [resolved, hidden, orderOf, selected]);
+
+  const dayState = days[selected];
+  const logsByEx = useMemo(() => {
+    const m = {};
+    (dayState ? dayState.logs : []).forEach(l => { if (l.exerciseId) m[l.exerciseId] = l; });
+    return m;
+  }, [dayState]);
+
+  const noteState = useMemo(() => splitNotes(dayState && dayState.note ? dayState.note.notes : ''), [dayState]);
+
+  const nextRace = useMemo(() => {
+    if (!data) return null;
+    const r = data.races.filter(x => x.date && x.date >= today && x.status !== 'Completed')
+                        .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return r ? { name: r.name, days: daysUntil(r.date) } : null;
+  }, [data, today]);
+
+  /* ---- copy-on-write ---- */
+  // Single-flight per week. Two quick edits on a template week would otherwise
+  // both pass the "is there an overlay yet" check and copy the week twice.
+  const materializing = useRef({});
+  const ensureOverlay = useCallback(date => {
+    const ws = weekStartOf(date);
+    if (schedRef.current.some(r => r.weekOf === ws)) return Promise.resolve(null);
+    if (materializing.current[ws]) return materializing.current[ws];
+    const p = materializeWeek(schedRef.current, ws).then(({ rows, map }) => {
+      setData(d => ({ ...d, schedule: d.schedule.concat(rows) }));
+      schedRef.current = schedRef.current.concat(rows);
+      return map;
+    }).finally(() => { delete materializing.current[ws]; });
+    materializing.current[ws] = p;
+    return p;
+  }, []);
+
+  /* ---- Done semantics ---- */
+  const toggleLine = async line => {
+    const date = selected;
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const log = snapshot.find(l => l.exerciseId === line.exerciseId);
+
+    const revert = () => { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that.', { kind: 'error' }); };
+
+    try {
+      if (!log) {
+        const tmp = 'tmp:' + Math.random().toString(36).slice(2);
+        patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text: 'Completed', done: true }]) }));
+        const res = await createLog(line.exerciseId, date, 'Completed', true);
+        const id = res.records[0].id;
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+      } else if (!log.done) {
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, done: true } : l)) }));
+        await patchLog(log.id, { [F.done]: true });
+      } else if (isCompleted(log.text)) {
+        // Nothing but the marker, so the log has nothing worth keeping.
+        patchDay(date, d => ({ logs: d.logs.filter(l => l.id !== log.id) }));
+        await deleteLog(log.id);
+      } else {
+        // A real result stays; only the tick comes off.
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, done: false } : l)) }));
+        await patchLog(log.id, { [F.done]: false });
+      }
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      revert();
+    }
+  };
+
+  /* ---- delete a row, with Undo and an Every-weekday promotion ---- */
+  const templateRowFor = (exerciseId, dow) =>
+    schedRef.current.find(r => !r.weekOf && r.dow === dow && r.exercises.includes(exerciseId));
+
+  const deleteLine = async line => {
+    const date = selected;
+    const dow = dowName(date);
+    setHidden(h => ({ ...h, [line.key]: true }));
+
+    try {
+      const map = await ensureOverlay(date);
+      const materialized = !!map;
+      const rowId = map && map[line.rowId] ? map[line.rowId].id : line.rowId;
+      const row = schedRef.current.find(r => r.id === rowId);
+      if (!row) throw new Error('row not found');
+
+      let undo;
+      if (row.exercises.length > 1) {
+        // Several exercises share this row; drop only this one.
+        const before = row.exercises;
+        const next = before.filter(id => id !== line.exerciseId);
+        await setRowExercises(rowId, next);
+        setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, exercises: next } : r)) }));
+        undo = async () => {
+          await setRowExercises(rowId, before);
+          setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === rowId ? { ...r, exercises: before } : r)) }));
+        };
+      } else {
+        const fields = rowFields(row);
+        await deleteMany(TBL.schedule, [rowId]);
+        setData(d => ({ ...d, schedule: d.schedule.filter(r => r.id !== rowId) }));
+        undo = async () => {
+          const made = await createMany(TBL.schedule, [fields]);
+          setData(d => ({ ...d, schedule: d.schedule.concat(made.map(shapeRow)) }));
+        };
+      }
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+
+      // The template row this came from, so the toast can offer to drop it too.
+      const tmpl = templateRowFor(line.exerciseId, dow);
+
+      showToast((materialized ? 'Customizing week of ' + fmtShort(weekStartOf(date)) + ' · removed ' : 'Removed ') + line.name, {
+        onUndo: () => { hideToast(); undo().catch(() => showToast('Could not undo that.', { kind: 'error' })); },
+        scopeLabel: tmpl ? 'Every ' + dow3(date) : null,
+        onScope: async () => {
+          try {
+            if (tmpl.exercises.length > 1) {
+              const next = tmpl.exercises.filter(id => id !== line.exerciseId);
+              await setRowExercises(tmpl.id, next);
+              setData(d => ({ ...d, schedule: d.schedule.map(r => (r.id === tmpl.id ? { ...r, exercises: next } : r)) }));
+            } else {
+              await deleteMany(TBL.schedule, [tmpl.id]);
+              setData(d => ({ ...d, schedule: d.schedule.filter(r => r.id !== tmpl.id) }));
+            }
+            setToast(t => (t ? { ...t, scopeDone: true, onUndo: null } : t));
+          } catch (e) {
+            if (e instanceof AuthError) { setReady(false); return; }
+            showToast('Could not remove it from every ' + dow + '.', { kind: 'error' });
+          }
+        },
+      });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+      showToast('Could not remove ' + line.name + '.', { kind: 'error' });
+    }
+  };
+
+  /* ---- hold-to-drag reorder ---- */
+  const listRef = useRef(null);
+  const drag = useRef(null);
+
+  const dragApi = useMemo(() => ({
+    start: (key, el) => {
+      const nodes = [...listRef.current.querySelectorAll('.sw')];
+      drag.current = { key, el, nodes, from: nodes.indexOf(el), to: nodes.indexOf(el) };
+      el.classList.add('lift');
+    },
+    move: clientY => {
+      const d = drag.current; if (!d) return;
+      d.nodes.forEach(n => n.classList.remove('gap-top', 'gap-bot'));
+      let to = d.nodes.length - 1;
+      for (let i = 0; i < d.nodes.length; i++) {
+        const b = d.nodes[i].getBoundingClientRect();
+        if (clientY < b.top + b.height / 2) { to = i; break; }
+      }
+      d.to = to;
+      const target = d.nodes[to];
+      if (target && target !== d.el) target.classList.add(to > d.from ? 'gap-bot' : 'gap-top');
+    },
+    end: commit => {
+      const d = drag.current; drag.current = null;
+      if (!d) return;
+      d.nodes.forEach(n => n.classList.remove('gap-top', 'gap-bot', 'lift'));
+      if (commit && d.to !== d.from) commitReorder(lines.map(l => l.key), d.from, d.to);
+    },
+    grip: (e, key) => {
+      // Edit-mode grip: drag starts immediately, no hold.
+      e.preventDefault();
+      const nodes = [...listRef.current.querySelectorAll('.sw')];
+      const el = nodes.find(n => n.dataset.id === key);
+      if (!el) return;
+      dragApi.start(key, el);
+      const move = ev => dragApi.move(ev.clientY);
+      const up = () => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        dragApi.end(true);
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    },
+  }), [lines]);  // eslint-disable-line
+
+  const commitReorder = async (keys, from, to) => {
+    const next = [...keys];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    const date = selected;
+    setOrderOf(o => ({ ...o, [date]: next }));
+    try {
+      const map = await ensureOverlay(date);
+      const byKey = Object.fromEntries(resolved.lines.map(l => [l.key, l]));
+      const seen = new Set(); const rowOrder = [];
+      next.forEach(k => {
+        const l = byKey[k]; if (!l) return;
+        const id = map && map[l.rowId] ? map[l.rowId].id : l.rowId;
+        if (!seen.has(id)) { seen.add(id); rowOrder.push(id); }
+      });
+      const records = rowOrder.map((id, i) => ({ id, fields: { 'Order': (i + 1) * 10 } }));
+      await updateMany(TBL.schedule, records);
+      const orderById = Object.fromEntries(records.map(r => [r.id, r.fields['Order']]));
+      setData(d => ({ ...d, schedule: d.schedule.map(r => (orderById[r.id] != null ? { ...r, order: orderById[r.id] } : r)) }));
+      setOrderOf(o => { const n = { ...o }; delete n[date]; return n; });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setOrderOf(o => { const n = { ...o }; delete n[date]; return n; });
+      showToast('Could not save the new order.', { kind: 'error' });
+    }
+  };
+
+  /* ---- day navigation ---- */
+  const go = n => { setSel(addDays(selected, n)); hideToast(); };
+  const swipe = useRef(null);
+  // Anything inside a swipe row owns its own gesture; only empty space pages days.
+  const onDown = e => { if (e.target.closest('.sw') || e.target.closest('.row')) return; swipe.current = { x: e.clientX, y: e.clientY }; };
+  const onUp = e => {
+    const s = swipe.current; swipe.current = null;
+    if (!s) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) go(dx < 0 ? 1 : -1);
+  };
+
+  const toggleTheme = () => {
+    const t = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t;
+    localStorage.setItem(LS_THEME, t);
+    setTheme(t);
+  };
+
+  /* ---- render ---- */
+  if (!ready) return <div className="phone"><Setup onDone={() => { setError(''); setReady(true); }} /></div>;
+  if (error) return <div className="phone"><div className="boot"><span style={{ color: '#FF453A' }}>{error}</span></div></div>;
+
+  if (pending) return (
+    <div className="phone">
+      <div className="setup">
+        <h1>One-time setup</h1>
+        <p>The Logs table has <b>{pending.total}</b> records and <b>{pending.pending}</b> of them have <b>Done</b> unchecked.
+           Everything already logged counts as done, so this checks them all in one pass. It writes to Airtable.</p>
+        <button onClick={runMigration} disabled={running}>{running ? status : 'Check Done on ' + pending.pending + ' logs'}</button>
+      </div>
+    </div>
+  );
+
+  if (!data) return <div className="phone"><div className="boot">{status}</div></div>;
+
+  return (
+    <div className={'phone' + (editing ? ' edit' : '')}>
+      <div className="topbtns">
+        <div className="pill round" style={{ fontSize: 18, marginRight: 'auto' }} onClick={toggleTheme}>◐</div>
+        <div className={'pill' + (editing ? ' on' : '')} onClick={() => setEditing(!editing)}>{editing ? 'Done' : 'Edit'}</div>
+      </div>
+
+      <div className="scroll" ref={listRef} onPointerDown={onDown} onPointerUp={onUp}>
+        <div className="daynav">
+          <h1>{dowName(selected)}</h1>
+          <div className="arrows"><span onClick={() => go(-1)}>‹</span><span onClick={() => go(1)}>›</span></div>
+        </div>
+        <div className="sub">
+          {fmtMonthDay(selected)}
+          {nextRace && <React.Fragment> · <span className="race">{nextRace.name} in {nextRace.days} days</span></React.Fragment>}
+        </div>
+
+        <NotesRow readiness={noteState.readiness} count={noteState.lines.length}
+                  onOpen={() => { if (!editing) showToast('The Notes page arrives in step 3.', { ms: 1800 }); }} />
+
+        {lines.map(l => (
+          <ExerciseRow key={l.key} line={l} log={logsByEx[l.exerciseId]} editing={editing}
+                       onToggle={() => toggleLine(l)}
+                       onOpen={() => { if (!editing) showToast('The Exercise page arrives in step 3.', { ms: 1800 }); }}
+                       onDelete={() => deleteLine(l)}
+                       dragApi={dragApi} />
+        ))}
+
+        {lines.length === 0 && (
+          <div style={{ padding: '40px 0', color: 'var(--dim)', fontSize: 17 }}>Nothing scheduled.</div>
+        )}
+      </div>
+
+      <Toast toast={toast}
+             onUndo={() => toast && toast.onUndo && toast.onUndo()}
+             onScope={() => toast && toast.onScope && !toast.scopeDone && toast.onScope()} />
+
+      <Tabs tab={tab}
+            onTab={id => { if (id !== 'today') showToast('That tab arrives in step 4.', { ms: 1800 }); }}
+            onAdd={() => showToast('The Add sheets arrive in step 5.', { ms: 1800 })} />
+    </div>
+  );
+}
+
+const savedTheme = localStorage.getItem(LS_THEME);
+document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
