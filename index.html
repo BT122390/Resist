@@ -166,6 +166,9 @@
   .week .on{color:var(--orange)}
 
   /* ── app additions on top of the mockup stylesheet ── */
+  /* rows carry z-index 1 so the Delete panel hides behind them, so the
+     slide-in pages have to clear that. */
+  .pg{z-index:10}
   .rowwrap{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y;user-select:none;-webkit-user-select:none;z-index:1}
   .sw .del2{z-index:0}
   .sw.lift .rowwrap{background:var(--pill);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);transform:scale(1.02);z-index:5}
@@ -508,6 +511,11 @@ const patchLog = (id, fields) =>
   at(TBL.logs, { method: 'PATCH', body: { records: [{ id, fields }] } });
 const deleteLog = id => at(TBL.logs + '/' + id, { method: 'DELETE' });
 
+const createNote = (date, notes) =>
+  at(TBL.dayNotes, { method: 'POST', body: { records: [{ fields: { 'Date': date, 'Notes': notes } }] } });
+const updateNote = (id, notes) =>
+  at(TBL.dayNotes, { method: 'PATCH', body: { records: [{ id, fields: { 'Notes': notes } }] } });
+
 const setRowExercises = (id, exercises) =>
   at(TBL.schedule, { method: 'PATCH', body: { records: [{ id, fields: { 'Exercise': exercises } }] } });
 
@@ -658,6 +666,291 @@ function Tabs({ tab, onTab, onAdd }) {
   );
 }
 
+/* ═══════════════════════ shared page bits ═══════════════════════ */
+
+const PAIN = [0, 1, 2, 3];
+const RPE  = [6, 7, 8, 9, 10];
+
+// Second quick chip: the last result with its first weight nudged up 5 lb.
+function bumpWeight(text) {
+  const m = String(text).match(/(\d+(?:\.\d+)?)(\s*lb)/i);
+  if (!m) return null;
+  const next = String(parseFloat(m[1]) + 5).replace(/\.0$/, '');
+  return text.slice(0, m.index) + next + m[2] + text.slice(m.index + m[0].length);
+}
+
+function Seg({ options, value, onPick, wide, readiness }) {
+  return (
+    <div className={'segc' + (readiness ? ' rdy' : '')}>
+      {options.map(o => (
+        <span key={o.value} className={(o.cls || '') + (value === o.value ? ' on' : '')}
+              style={wide ? { width: 'auto', padding: '5px 12px' } : null}
+              onClick={() => onPick(value === o.value ? null : o.value)}>
+          {o.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HistoryPanel({ logs, date }) {
+  const [all, setAll] = useState(false);
+  if (logs === null) return <div className="grp"><div className="cell"><div className="k">History</div><div className="v muted" style={{ margin: 0 }}>Loading…</div></div></div>;
+  const past = logs.filter(l => l.date !== date);
+  const shown = all ? past : past.slice(0, 5);
+  return (
+    <div className="grp">
+      <div className="cell">
+        <div className="k">History</div>
+        {past.length === 0 && <div className="v muted" style={{ margin: 0 }}>No results yet.</div>}
+        {shown.map(l => {
+          const r = splitResult(l.text);
+          return (
+            <div className="h" key={l.id}>
+              <span>{fmtShort(l.date)}</span>
+              <div>
+                {isCompleted(l.text) ? <span style={{ color: 'var(--muted)' }}>Completed</span> : r.body}
+                {r.pain != null && <span style={{ color: r.pain >= 3 ? '#FF453A' : r.pain >= 2 ? 'var(--orange)' : 'var(--muted)' }}> · pain {r.pain}</span>}
+                {r.rpe != null && <span style={{ color: 'var(--muted)' }}> · RPE {r.rpe}</span>}
+              </div>
+            </div>
+          );
+        })}
+        {!all && past.length > 5 && <div className="more" onClick={() => setAll(true)}>Show all {past.length}</div>}
+      </div>
+    </div>
+  );
+}
+
+function CoachingPanel({ notes }) {
+  if (!notes) return null;
+  const paras = notes.split('\n').map(s => s.trim()).filter(Boolean);
+  return (
+    <div className="grp">
+      <div className="cell">
+        <div className="k">Coaching notes</div>
+        {paras.map((t, i) => <div key={i} className={i === 0 ? 'v' : 'v muted'}>{t}</div>)}
+      </div>
+    </div>
+  );
+}
+
+// Horizontal swipe between neighbours on a page.
+function usePageSwipe(onPrev, onNext) {
+  const g = useRef(null);
+  return {
+    onPointerDown: e => { if (e.target.closest('input,textarea,.segc,.cell.chips')) return; g.current = { x: e.clientX, y: e.clientY }; },
+    onPointerUp: e => {
+      const s = g.current; g.current = null;
+      if (!s) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) (dx < 0 ? onNext : onPrev)();
+    },
+  };
+}
+
+/* ═══════════════════════ exercise page ═══════════════════════ */
+
+function ExercisePage({ line, index, total, date, exercise, log, prev, next,
+                        onBack, onGo, onSave, onSkip, onNote }) {
+  const existing = log ? splitResult(log.text) : null;
+  const [text, setText] = useState(existing && !isCompleted(log.text) && !isSkipped(log.text) ? existing.body : '');
+  const [pain, setPain] = useState(existing ? existing.pain : null);
+  const [rpe, setRpe]   = useState(existing ? existing.rpe : null);
+  const [note, setNote] = useState('');
+  const [hist, setHist] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const e = log ? splitResult(log.text) : null;
+    setText(e && !isCompleted(log.text) && !isSkipped(log.text) ? e.body : '');
+    setPain(e ? e.pain : null);
+    setRpe(e ? e.rpe : null);
+    setNote('');
+  }, [line.key]);  // eslint-disable-line
+
+  useEffect(() => {
+    let live = true;
+    setHist(null);
+    limit(() => atAll(TBL.logs, [
+      ['filterByFormula', '{Exercise} = "' + esc(line.name) + '"'],
+      ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+    ])).then(rs => { if (live) setHist(rs.map(shapeLog)); }).catch(() => { if (live) setHist([]); });
+    return () => { live = false; };
+  }, [line.name]);
+
+  const past = (hist || []).filter(l => l.date !== date && !isCompleted(l.text) && !isSkipped(l.text));
+  const lastOne = past[0] || null;
+
+  const chips = [];
+  if (lastOne) {
+    const b = splitResult(lastOne.text).body;
+    chips.push(b);
+    const up = bumpWeight(b);
+    if (up) chips.push(up);
+  }
+  chips.push('Skipped');
+
+  const sub = [line.block || line.section, pairedWith(line.prescription)].filter(Boolean).join(' · ');
+  const swipe = usePageSwipe(() => prev && onGo(prev), () => next && onGo(next));
+
+  const save = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    await onSave(joinResult(text, pain, rpe));
+    setBusy(false);
+  };
+
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onBack}>‹ {dowName(date)}</div>
+        <div className="pos">{index + 1} of {total}</div>
+        <div className="pill" style={{ height: 34, padding: '0 14px', fontSize: 15 }} onClick={onSkip}>Skip</div>
+      </div>
+
+      <div className="scroll" {...swipe} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}>
+        <h1 style={{ fontSize: 30, paddingTop: 6 }}>{line.name}</h1>
+        {sub && <div className="sub">{sub}</div>}
+
+        <div className="grp">
+          {line.prescription && <div className="cell"><div className="k">Prescription</div><div className="v">{line.prescription}</div></div>}
+          <div className="cell">
+            <div className="k">Last result{lastOne ? ' · ' + fmtShort(lastOne.date) : ''}</div>
+            <div className="v">{lastOne ? splitResult(lastOne.text).body : <span style={{ color: 'var(--muted)' }}>Nothing logged yet</span>}</div>
+          </div>
+        </div>
+
+        <div className="grp">
+          <div className="cell in">
+            <input className="inp" value={text} placeholder="Result"
+                   onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()} />
+            <div className="save" onClick={save} style={busy ? { opacity: .5 } : null}>Save</div>
+          </div>
+          <div className="cell chips">
+            {chips.map(c => <span key={c} onClick={() => setText(c)}>{c}</span>)}
+          </div>
+          <div className="cell in">
+            <input className="inp" style={{ fontSize: 16 }} value={note} placeholder="Note"
+                   onChange={e => setNote(e.target.value)}
+                   onKeyDown={e => { if (e.key === 'Enter' && note.trim()) { onNote(note.trim()); setNote(''); } }} />
+            {note.trim() && <div className="save" onClick={() => { onNote(note.trim()); setNote(''); }}>Add</div>}
+          </div>
+          <div className="cell seg">
+            <div className="k">Pain</div>
+            <Seg options={PAIN.map(n => ({ value: n, label: n }))} value={pain} onPick={setPain} />
+          </div>
+          <div className="cell seg">
+            <div className="k">RPE</div>
+            <Seg options={RPE.map(n => ({ value: n, label: n }))} value={rpe} onPick={setRpe} />
+          </div>
+        </div>
+
+        <CoachingPanel notes={exercise && exercise.notes} />
+        <HistoryPanel logs={hist} date={date} />
+      </div>
+
+      <div className="nav">
+        <div onClick={() => prev && onGo(prev)} style={prev ? null : { color: 'var(--dim)' }}>
+          {prev ? '‹ ' + prev.name : '‹'}
+        </div>
+        <div onClick={() => next && onGo(next)} style={next ? null : { color: 'var(--dim)' }}>
+          {next ? next.name + ' ›' : '›'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ notes page ═══════════════════════ */
+
+function NoteLine({ label, text, onDelete }) {
+  const el = useRef(null);
+  const g = useRef(null);
+  const setX = x => { if (el.current) el.current.style.transform = x ? 'translateX(' + x + 'px)' : ''; };
+  const down = e => { if (!onDelete) return; g.current = { x0: e.clientX, y0: e.clientY, lastX: e.clientX, axis: null }; if (el.current) el.current.style.transition = 'none'; };
+  const move = e => {
+    const s = g.current; if (!s) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (s.axis === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { s.axis = 'y'; setX(0); return; }
+      if (dx < -12 && Math.abs(dx) > Math.abs(dy) * 1.5) s.axis = 'x'; else return;
+    }
+    if (s.axis !== 'x') return;
+    s.lastX = e.clientX;
+    setX(Math.max(Math.min(0, dx), -130));
+  };
+  const finish = commit => () => {
+    const s = g.current; g.current = null;
+    if (el.current) el.current.style.transition = '';
+    if (!s || s.axis !== 'x' || !commit) return setX(0);
+    if (s.lastX - s.x0 < -120) { setX(-window.innerWidth); setTimeout(onDelete, 160); }
+    else setX(0);
+  };
+  return (
+    <div className="h" ref={el} onPointerDown={down} onPointerMove={move}
+         onPointerUp={finish(true)} onPointerCancel={finish(false)}
+         style={{ transition: 'transform .18s', touchAction: 'pan-y' }}>
+      <span>{label}</span>
+      <div>{text}</div>
+    </div>
+  );
+}
+
+function NotesPage({ date, readiness, lines, times, weekLines, onBack, onReadiness, onAdd, onDelete, onJump }) {
+  const [draft, setDraft] = useState('');
+  const add = () => { if (!draft.trim()) return; onAdd(draft.trim()); setDraft(''); };
+  return (
+    <div className="pg on">
+      <div className="pgtop">
+        <div className="back" onClick={onBack}>‹ {dowName(date)}</div>
+        <div className="pos">{fmtShort(date)}</div>
+        <div style={{ width: 60 }} />
+      </div>
+      <div className="scroll">
+        <h1 style={{ fontSize: 30, paddingTop: 6 }}>Notes</h1>
+
+        <div className="grp">
+          <div className="cell seg">
+            <div className="k">Readiness</div>
+            <Seg readiness
+                 options={[{ value: 'Green', label: 'Green', cls: 'g' }, { value: 'Yellow', label: 'Yellow', cls: 'y' }, { value: 'Red', label: 'Red', cls: 'r' }]}
+                 value={readiness} onPick={onReadiness} />
+          </div>
+        </div>
+
+        <div className="grp">
+          <div className="cell in">
+            <input className="inp" value={draft} placeholder="Add a note"
+                   onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+            <div className="save" onClick={add}>Add</div>
+          </div>
+        </div>
+
+        <div className="grp">
+          <div className="cell">
+            {lines.length === 0 && <div className="v muted" style={{ margin: 0 }}>Nothing for this day yet.</div>}
+            {lines.map((t, i) => <NoteLine key={i + ':' + t} label={times[t] || ''} text={t} onDelete={() => onDelete(i)} />)}
+          </div>
+        </div>
+
+        {weekLines.length > 0 && (
+          <div className="grp">
+            <div className="cell">
+              <div className="k">Earlier this week</div>
+              {weekLines.map(w => w.lines.map((t, i) => (
+                <div key={w.date + i} onClick={() => onJump(w.date)}>
+                  <NoteLine label={dow3(w.date)} text={t} />
+                </div>
+              )))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════ app ═══════════════════════ */
 
 function Setup({ onDone }) {
@@ -705,6 +998,9 @@ function App() {
   const [hidden, setHidden] = useState({});
   const [orderOf, setOrderOf] = useState({});
   const [theme, setTheme]   = useState(document.documentElement.dataset.theme);
+  const [openKey, setOpenKey] = useState(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteTimes, setNoteTimes] = useState({});
 
   const today = todayISO();
   const daysRef  = useRef(days);  daysRef.current = days;
@@ -881,6 +1177,51 @@ function App() {
       if (e instanceof AuthError) { setReady(false); return; }
       revert();
     }
+  };
+
+  /* ---- write a result ---- */
+  const writeResult = useCallback(async (line, date, text) => {
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const log = snapshot.find(l => l.exerciseId === line.exerciseId);
+    try {
+      if (log) {
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, text, done: true } : l)) }));
+        await patchLog(log.id, { 'Log Text': text, [F.done]: true });
+      } else {
+        const tmp = 'tmp:' + Math.random().toString(36).slice(2);
+        patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text, done: true }]) }));
+        const res = await createLog(line.exerciseId, date, text, true);
+        const id = res.records[0].id;
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+      }
+      return true;
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return false; }
+      patchDay(date, () => ({ logs: snapshot }));
+      showToast('Could not save that result.', { kind: 'error' });
+      return false;
+    }
+  }, [patchDay, showToast]);
+
+  /* ---- day notes ---- */
+  const writeNotes = useCallback(async (date, readiness, noteLines) => {
+    const next = buildNotes(readiness, noteLines);
+    const snapshot = (daysRef.current[date] || {}).note || null;
+    patchDay(date, () => ({ note: { id: snapshot ? snapshot.id : 'tmp', date, notes: next } }));
+    try {
+      const res = snapshot && snapshot.id !== 'tmp' ? await updateNote(snapshot.id, next) : await createNote(date, next);
+      const id = res.records[0].id;
+      patchDay(date, d => ({ note: { ...d.note, id } }));
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      patchDay(date, () => ({ note: snapshot }));
+      showToast('Could not save that note.', { kind: 'error' });
+    }
+  }, [patchDay, showToast]);
+
+  const addNote = (text) => {
+    setNoteTimes(m => ({ ...m, [text]: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }));
+    writeNotes(selected, noteState.readiness, noteState.lines.concat([text]));
   };
 
   /* ---- delete a row, with Undo and an Every-weekday promotion ---- */
@@ -1077,12 +1418,12 @@ function App() {
         </div>
 
         <NotesRow readiness={noteState.readiness} count={noteState.lines.length}
-                  onOpen={() => { if (!editing) showToast('The Notes page arrives in step 3.', { ms: 1800 }); }} />
+                  onOpen={() => { if (!editing) setNotesOpen(true); }} />
 
         {lines.map(l => (
           <ExerciseRow key={l.key} line={l} log={logsByEx[l.exerciseId]} editing={editing}
                        onToggle={() => toggleLine(l)}
-                       onOpen={() => { if (!editing) showToast('The Exercise page arrives in step 3.', { ms: 1800 }); }}
+                       onOpen={() => { if (!editing) setOpenKey(l.key); }}
                        onDelete={() => deleteLine(l)}
                        dragApi={dragApi} />
         ))}
@@ -1091,6 +1432,45 @@ function App() {
           <div style={{ padding: '40px 0', color: 'var(--dim)', fontSize: 17 }}>Nothing scheduled.</div>
         )}
       </div>
+
+      {(() => {
+        if (!openKey) return null;
+        const i = lines.findIndex(l => l.key === openKey);
+        if (i < 0) return null;
+        const line = lines[i];
+        return (
+          <ExercisePage
+            line={line} index={i} total={lines.length} date={selected}
+            exercise={data.exById[line.exerciseId]} log={logsByEx[line.exerciseId]}
+            prev={lines[i - 1] || null} next={lines[i + 1] || null}
+            onBack={() => setOpenKey(null)}
+            onGo={l => setOpenKey(l.key)}
+            onSave={text => writeResult(line, selected, text)}
+            onSkip={async () => { await writeResult(line, selected, 'Skipped'); setOpenKey(null); }}
+            onNote={text => addNote(line.name + ': ' + text)}
+          />
+        );
+      })()}
+
+      {notesOpen && (
+        <NotesPage
+          date={selected} readiness={noteState.readiness} lines={noteState.lines.slice().reverse()} times={noteTimes}
+          weekLines={weekDays(selected).filter(d => d !== selected)
+            .map(d => ({ date: d, lines: splitNotes((days[d] || {}).note ? days[d].note.notes : '').lines }))
+            .filter(w => w.lines.length)}
+          onBack={() => setNotesOpen(false)}
+          onReadiness={r => writeNotes(selected, r, noteState.lines)}
+          onAdd={addNote}
+          onDelete={i => {
+            const keep = noteState.lines.slice();
+            keep.splice(keep.length - 1 - i, 1);
+            const before = noteState.lines;
+            writeNotes(selected, noteState.readiness, keep);
+            showToast('Removed note', { onUndo: () => { hideToast(); writeNotes(selected, noteState.readiness, before); } });
+          }}
+          onJump={d => { setNotesOpen(false); setSel(d); }}
+        />
+      )}
 
       <Toast toast={toast}
              onUndo={() => toast && toast.onUndo && toast.onUndo()}
