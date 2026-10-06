@@ -533,6 +533,17 @@ const createNote = (date, notes) =>
 const updateNote = (id, notes) =>
   at(TBL.dayNotes, { method: 'PATCH', body: { records: [{ id, fields: { 'Notes': notes } }] } });
 
+// What Airtable actually holds for this exercise on this date. The local cache
+// can be cold or stale, and trusting it is what duplicated records.
+async function findLog(exerciseName, date) {
+  const rs = await atAll(TBL.logs, [
+    ['filterByFormula', 'AND({Exercise} = "' + esc(exerciseName) + '", {Log Date} = "' + date + '")'],
+    ['sort[0][field]', 'Log Date'], ['sort[0][direction]', 'desc'],
+    ['maxRecords', 3],
+  ]);
+  return rs.map(shapeLog);
+}
+
 const setRowExercises = (id, exercises) =>
   at(TBL.schedule, { method: 'PATCH', body: { records: [{ id, fields: { 'Exercise': exercises } }] } });
 
@@ -1578,15 +1589,6 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState !== 'visible' || !data) return;
-      if (Date.now() - data.fetchedAt > STALE_MS) loadCore().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, [data, loadCore]);
-
   /* ---- per-date logs and note ---- */
   const patchDay = useCallback((date, fn) => {
     setDays(prev => {
@@ -1595,20 +1597,71 @@ function App() {
     });
   }, []);
 
-  const loadDay = useCallback(async d => {
+  // Always refetches. Airtable is the truth; the cache is only a view of it.
+  const refreshDay = useCallback(async d => {
     const [logs, notes] = await Promise.all([
       limit(() => atAll(TBL.logs, [['filterByFormula', '{Log Date} = "' + d + '"']])),
       limit(() => atAll(TBL.dayNotes, [['filterByFormula', '{Date} = "' + d + '"']])),
     ]);
     patchDay(d, () => ({ logs: logs.map(shapeLog), note: notes[0] ? shapeNote(notes[0]) : null, loaded: true }));
+    return logs.length;
   }, [patchDay]);
+
+  const loadDay = refreshDay;
+
+  const ensureDay = useCallback(d => {
+    const cur = daysRef.current[d];
+    if (cur && cur.loaded) return Promise.resolve();
+    return refreshDay(d);
+  }, [refreshDay]);
 
   useEffect(() => {
     if (!data) return;
-    [selected, addDays(selected, -1), addDays(selected, 1)].forEach(d => {
-      if (!(days[d] && days[d].loaded)) loadDay(d).catch(() => {});
-    });
-  }, [data, selected]);  // eslint-disable-line
+    [selected, addDays(selected, -1), addDays(selected, 1)].forEach(d => { ensureDay(d).catch(() => {}); });
+  }, [data, selected, ensureDay]);  // eslint-disable-line
+
+  // On every launch, say out loud how many logs today actually came back.
+  const announced = useRef(false);
+  useEffect(() => {
+    if (!data || announced.current) return;
+    announced.current = true;
+    const d = todayISO();
+    refreshDay(d).then(n => {
+      console.log('%cResist · ' + d + ' · ' + n + ' log' + (n === 1 ? '' : 's') + ' fetched for today',
+                  'font-weight:700;color:#FF9F0A');
+    }).catch(e => console.warn('Resist · could not fetch today\'s logs:', e));
+  }, [data, refreshDay]);
+
+  // The app can sit open for days. Coming back to it must land on the real
+  // today and on what Airtable currently holds, not on stale state.
+  const lastSeenToday = useRef(todayISO());
+  const selectedRef = useRef(selected); selectedRef.current = selected;
+  const dataRef = useRef(data); dataRef.current = data;
+
+  // Catching up covers two cases: the app resumed from the background, and the
+  // app left open and visible while the clock rolled past midnight. Only the
+  // first fires visibilitychange, so a slow interval backs it up.
+  const catchUp = useCallback(async ({ force } = {}) => {
+    if (!dataRef.current) return;
+    const now = todayISO();
+    const rolledOver = now !== lastSeenToday.current;
+    lastSeenToday.current = now;
+    if (rolledOver) { setSel(now); setEditing(false); }
+    if (!rolledOver && !force) return;
+    if (Date.now() - dataRef.current.fetchedAt > STALE_MS) await loadCore().catch(() => {});
+    // Logs go stale fastest, so they come back from Airtable every time.
+    const d = rolledOver ? now : selectedRef.current;
+    refreshDay(d).catch(() => {});
+    if (d !== now) refreshDay(now).catch(() => {});
+  }, [loadCore, refreshDay]);
+
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'visible') catchUp({ force: true }); };
+    document.addEventListener('visibilitychange', onVis);
+    const id = setInterval(() => catchUp(), 60000);
+    window.RESIST_catchUp = catchUp;
+    return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(id); };
+  }, [catchUp]);
 
   /* ---- derived ---- */
   const resolved = useMemo(
@@ -1662,17 +1715,21 @@ function App() {
   const toggleLine = async line => {
     const date = selected;
     const snapshot = (daysRef.current[date] || { logs: [] }).logs;
-    const log = snapshot.find(l => l.exerciseId === line.exerciseId);
+    let log = snapshot.find(l => l.exerciseId === line.exerciseId);
 
     const revert = () => { patchDay(date, () => ({ logs: snapshot })); showToast('Could not save that.', { kind: 'error' }); };
 
     try {
+      if (!log || String(log.id).startsWith('tmp')) {
+        const found = await findLog(line.name, date);
+        if (found.length) log = found[0];
+      }
       if (!log) {
-        const tmp = 'tmp:' + Math.random().toString(36).slice(2);
-        patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text: 'Completed', done: true }]) }));
-        const res = await createLog(line.exerciseId, date, 'Completed', true);
-        const id = res.records[0].id;
-        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+        patchDay(date, d => ({
+          logs: d.logs.filter(l => l.exerciseId !== line.exerciseId)
+                      .concat([{ id: 'tmp', exerciseId: line.exerciseId, date, text: 'Completed', done: true }]),
+        }));
+        await createLog(line.exerciseId, date, 'Completed', true);
       } else if (!log.done) {
         patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, done: true } : l)) }));
         await patchLog(log.id, { [F.done]: true });
@@ -1685,6 +1742,7 @@ function App() {
         patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, done: false } : l)) }));
         await patchLog(log.id, { [F.done]: false });
       }
+      await refreshDay(date);
     } catch (e) {
       if (e instanceof AuthError) { setReady(false); return; }
       revert();
@@ -1866,18 +1924,25 @@ function App() {
   /* ---- write a result ---- */
   const writeResult = useCallback(async (line, date, text) => {
     const snapshot = (daysRef.current[date] || { logs: [] }).logs;
-    const log = snapshot.find(l => l.exerciseId === line.exerciseId);
+    let log = snapshot.find(l => l.exerciseId === line.exerciseId);
     try {
-      if (log) {
-        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === log.id ? { ...l, text, done: true } : l)) }));
+      // The cache can be cold or stale; only Airtable knows whether a record
+      // for this exercise and date already exists.
+      if (!log || String(log.id).startsWith('tmp:')) {
+        const found = await findLog(line.name, date);
+        if (found.length) log = found[0];
+      }
+      if (log && !String(log.id).startsWith('tmp:')) {
+        patchDay(date, d => ({ logs: d.logs.map(l => (l.exerciseId === line.exerciseId ? { ...l, id: log.id, text, done: true } : l)) }));
         await patchLog(log.id, { 'Log Text': text, [F.done]: true });
       } else {
-        const tmp = 'tmp:' + Math.random().toString(36).slice(2);
-        patchDay(date, d => ({ logs: d.logs.concat([{ id: tmp, exerciseId: line.exerciseId, date, text, done: true }]) }));
-        const res = await createLog(line.exerciseId, date, text, true);
-        const id = res.records[0].id;
-        patchDay(date, d => ({ logs: d.logs.map(l => (l.id === tmp ? { ...l, id } : l)) }));
+        patchDay(date, d => ({
+          logs: d.logs.filter(l => l.exerciseId !== line.exerciseId)
+                      .concat([{ id: 'tmp', exerciseId: line.exerciseId, date, text, done: true }]),
+        }));
+        await createLog(line.exerciseId, date, text, true);
       }
+      await refreshDay(date);
       return true;
     } catch (e) {
       if (e instanceof AuthError) { setReady(false); return false; }
@@ -1885,7 +1950,7 @@ function App() {
       showToast('Could not save that result.', { kind: 'error' });
       return false;
     }
-  }, [patchDay, showToast]);
+  }, [patchDay, showToast, refreshDay]);
 
   /* ---- day notes ---- */
   const writeNotes = useCallback(async (date, readiness, noteLines) => {
