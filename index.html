@@ -169,6 +169,7 @@
   /* rows carry z-index 1 so the Delete panel hides behind them, so the
      slide-in pages have to clear that. */
   .pg{z-index:10}
+  .alsodid{border-top:1px solid var(--hair);margin:18px 0 0}
   .rowwrap{background:var(--bg);position:relative;transition:transform .18s;touch-action:pan-y;user-select:none;-webkit-user-select:none;z-index:1}
   .sw .del2{z-index:0}
   .sw.lift .rowwrap{background:var(--pill);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6);transform:scale(1.02);z-index:5}
@@ -579,7 +580,7 @@ function Toast({ toast, onUndo, onScope }) {
 // Swipe left to delete, press and hold to reorder. The axis is decided once
 // per touch; a pointercancel — the browser taking the gesture over to scroll —
 // always snaps back rather than committing anything.
-function SwipeRow({ children, editing, onDelete, onOpen, dragApi, id }) {
+function SwipeRow({ children, editing, onDelete, onOpen, dragApi, id, extra, draggable = true }) {
   const sw = useRef(null);
   const row = useRef(null);
   const g = useRef(null);
@@ -595,6 +596,7 @@ function SwipeRow({ children, editing, onDelete, onOpen, dragApi, id }) {
     g.current = { x0: e.clientX, y0: e.clientY, lastX: e.clientX, axis: null, dragging: false };
     moved.current = false;
     if (row.current) row.current.style.transition = 'none';
+    if (!draggable) return;
     hold.current = setTimeout(() => {
       const s = g.current;
       if (!s || s.axis) return;
@@ -638,7 +640,7 @@ function SwipeRow({ children, editing, onDelete, onOpen, dragApi, id }) {
   };
 
   return (
-    <div className="sw" ref={sw} data-id={id}>
+    <div className={'sw' + (extra ? ' extra' : '')} ref={sw} data-id={id}>
       <div className="del2" onClick={onDelete}>Delete</div>
       <div ref={row} className="rowwrap"
            onPointerDown={down} onPointerMove={move}
@@ -654,12 +656,13 @@ function ExerciseRow({ line, log, editing, onToggle, onOpen, onDelete, dragApi }
   const done = !!(log && log.done);
   const hasLog = !!log;
   return (
-    <SwipeRow id={line.key} editing={editing} onDelete={onDelete} onOpen={onOpen} dragApi={dragApi}>
+    <SwipeRow id={line.key} editing={editing} onDelete={onDelete} onOpen={onOpen} dragApi={dragApi}
+              extra={line.unscheduled} draggable={!line.unscheduled}>
       <div className={'row' + (done ? ' done' : '') + (hasLog ? ' haslog' : '')}>
         <div className="del" onClick={e => { e.stopPropagation(); onDelete(); }}>–</div>
         <div style={{ flex: 1 }}><div className="big nm">{line.name}</div></div>
         <div className="tg" onClick={e => { e.stopPropagation(); onToggle(); }}><i /></div>
-        <span className="grip" onPointerDown={e => { e.stopPropagation(); dragApi.grip(e, line.key); }}>☰</span>
+        {!line.unscheduled && <span className="grip" onPointerDown={e => { e.stopPropagation(); dragApi.grip(e, line.key); }}>☰</span>}
       </div>
     </SwipeRow>
   );
@@ -1685,6 +1688,27 @@ function App() {
     return m;
   }, [dayState]);
 
+  // Anything logged on this date that the plan does not contain still gets a
+  // row, so three hours later the day shows what was actually done.
+  const extraLines = useMemo(() => {
+    if (!data) return [];
+    const scheduled = new Set(lines.map(l => l.exerciseId));
+    return (dayState ? dayState.logs : [])
+      .filter(l => l.exerciseId && !scheduled.has(l.exerciseId))
+      .filter(l => !hidden['log:' + l.id])
+      .map(l => ({
+        key: 'log:' + l.id,
+        rowId: null,
+        logId: l.id,
+        exerciseId: l.exerciseId,
+        name: (data.exById[l.exerciseId] || {}).name || '(unknown exercise)',
+        prescription: '', section: '', block: '',
+        unscheduled: true,
+      }));
+  }, [data, lines, dayState, hidden]);
+
+  const allLines = useMemo(() => lines.concat(extraLines), [lines, extraLines]);
+
   const noteState = useMemo(() => splitNotes(dayState && dayState.note ? dayState.note.notes : ''), [dayState]);
 
   const nextRace = useMemo(() => {
@@ -1973,6 +1997,31 @@ function App() {
     writeNotes(selected, noteState.readiness, noteState.lines.concat([text]));
   };
 
+  /* ---- remove a row that exists only because of its log ---- */
+  const deleteUnscheduled = async line => {
+    const date = selected;
+    const snapshot = (daysRef.current[date] || { logs: [] }).logs;
+    const log = snapshot.find(l => l.id === line.logId);
+    if (!log) return;
+    setHidden(h => ({ ...h, [line.key]: true }));
+    try {
+      await deleteLog(log.id);
+      await refreshDay(date);
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+      showToast('Removed ' + line.name, {
+        onUndo: async () => {
+          hideToast();
+          try { await createLog(log.exerciseId, date, log.text, log.done); await refreshDay(date); }
+          catch (e) { showToast('Could not undo that.', { kind: 'error' }); }
+        },
+      });
+    } catch (e) {
+      if (e instanceof AuthError) { setReady(false); return; }
+      setHidden(h => { const n = { ...h }; delete n[line.key]; return n; });
+      showToast('Could not remove ' + line.name + '.', { kind: 'error' });
+    }
+  };
+
   /* ---- delete a row, with Undo and an Every-weekday promotion ---- */
   const templateRowFor = (exerciseId, dow) =>
     schedRef.current.find(r => !r.weekOf && r.dow === dow && r.exercises.includes(exerciseId));
@@ -2047,7 +2096,7 @@ function App() {
 
   const dragApi = useMemo(() => ({
     start: (key, el) => {
-      const nodes = [...listRef.current.querySelectorAll('.sw')];
+      const nodes = [...listRef.current.querySelectorAll('.sw:not(.extra)')];
       drag.current = { key, el, nodes, from: nodes.indexOf(el), to: nodes.indexOf(el) };
       el.classList.add('lift');
     },
@@ -2072,7 +2121,7 @@ function App() {
     grip: (e, key) => {
       // Edit-mode grip: drag starts immediately, no hold.
       e.preventDefault();
-      const nodes = [...listRef.current.querySelectorAll('.sw')];
+      const nodes = [...listRef.current.querySelectorAll('.sw:not(.extra)')];
       const el = nodes.find(n => n.dataset.id === key);
       if (!el) return;
       dragApi.start(key, el);
@@ -2199,7 +2248,17 @@ function App() {
                        dragApi={dragApi} />
         ))}
 
-        {lines.length === 0 && (
+        {extraLines.length > 0 && lines.length > 0 && <div className="alsodid" />}
+
+        {extraLines.map(l => (
+          <ExerciseRow key={l.key} line={l} log={logsByEx[l.exerciseId]} editing={editing}
+                       onToggle={() => toggleLine(l)}
+                       onOpen={() => { if (!editing) setOpenKey(l.key); }}
+                       onDelete={() => deleteUnscheduled(l)}
+                       dragApi={dragApi} />
+        ))}
+
+        {allLines.length === 0 && (
           <div style={{ padding: '40px 0', color: 'var(--dim)', fontSize: 17 }}>Nothing scheduled.</div>
         )}
         </React.Fragment>
@@ -2208,14 +2267,14 @@ function App() {
 
       {(() => {
         if (!openKey) return null;
-        const i = lines.findIndex(l => l.key === openKey);
+        const i = allLines.findIndex(l => l.key === openKey);
         if (i < 0) return null;
-        const line = lines[i];
+        const line = allLines[i];
         return (
           <ExercisePage
-            line={line} index={i} total={lines.length} date={selected}
+            line={line} index={i} total={allLines.length} date={selected}
             exercise={data.exById[line.exerciseId]} log={logsByEx[line.exerciseId]}
-            prev={lines[i - 1] || null} next={lines[i + 1] || null}
+            prev={allLines[i - 1] || null} next={allLines[i + 1] || null}
             onBack={() => setOpenKey(null)}
             onGo={l => setOpenKey(l.key)}
             onSave={text => writeResult(line, selected, text)}
